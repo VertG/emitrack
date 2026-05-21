@@ -31,13 +31,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen perubahan auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setUser(session?.user ?? null)
+        if (event === 'SIGNED_IN' && session?.user) {
+          ensureProfile(session.user.id, session.user.user_metadata?.full_name)
+        }
       }
     )
 
     return () => subscription.unsubscribe()
   }, [])
+
+  async function ensureProfile(userId: string, fullName?: string) {
+    await supabase.from('profiles').upsert(
+      { id: userId, username: fullName ?? null, kota: 'Jakarta' },
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+  }
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({

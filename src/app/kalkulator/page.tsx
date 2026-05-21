@@ -12,6 +12,9 @@ const JENIS_KENDARAAN = [
   { value: 'mobil', label: 'Mobil' },
 ]
 
+const MODA_BBM_KEYS = ['transjakarta', 'krl', 'sepeda']
+const MODA_ICONS = ['🚌', '🚆', '🚲']
+
 const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
   motor: [
     { value: 'pertalite', label: 'Pertalite' },
@@ -30,8 +33,9 @@ export default function KalkulatorPage() {
   const [jenis, setJenis] = useState('motor')
   const [bbm, setBbm] = useState('pertalite')
   const [jarak, setJarak] = useState(20)
-  const [loading, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
@@ -43,37 +47,65 @@ export default function KalkulatorPage() {
   const vsRataRata = Number(((emisiHarian / RATA_RATA_NASIONAL) * 100).toFixed(0))
   const rekomendasi = rekomendasiRute(emisiHarian, jarak)
 
+  async function upsertProfile(tambahPoin: number, tambahHemat: number) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('total_poin, total_hemat')
+      .eq('id', user!.id)
+      .single()
+    await supabase.from('profiles').upsert({
+      id: user!.id,
+      total_poin: (profile?.total_poin ?? 0) + tambahPoin,
+      total_hemat: (profile?.total_hemat ?? 0) + tambahHemat,
+      updated_at: new Date().toISOString(),
+    })
+  }
+
   async function simpanTrip() {
     if (!user) return
     setSaving(true)
     setSaved(false)
+    setSaveError('')
 
-    // Simpan trip
-    await supabase.from('trips').insert({
+    const { error } = await supabase.from('trips').insert({
       user_id: user.id,
       jenis,
       bbm,
       jarak_km: jarak,
       emisi_kg: emisiHarian,
+      emisi_dihemat: 0,
+      poin_didapat: 10,
     })
 
-    // Update total_hemat dan total_poin di profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('total_poin, total_hemat')
-      .eq('id', user.id)
-      .single()
+    if (error) { setSaveError(error.message); setSaving(false); return }
 
-    if (profile) {
-      await supabase
-        .from('profiles')
-        .update({
-          total_poin: (profile.total_poin ?? 0) + 10,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-    }
+    await upsertProfile(10, 0)
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+  }
 
+  async function simpanModaAlternatif(bbmKey: string, emisiModa: number, hemat: number, poin: number) {
+    if (!user) return
+    setSaving(true)
+    setSaved(false)
+    setSaveError('')
+
+    const emisiDihemat = Number(hemat.toFixed(3))
+
+    const { error } = await supabase.from('trips').insert({
+      user_id: user.id,
+      jenis: 'transportasi_umum',
+      bbm: bbmKey,
+      jarak_km: jarak,
+      emisi_kg: Number(emisiModa.toFixed(3)),
+      emisi_dihemat: emisiDihemat,
+      poin_didapat: poin,
+    })
+
+    if (error) { setSaveError(error.message); setSaving(false); return }
+
+    await upsertProfile(poin, emisiDihemat)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -188,30 +220,42 @@ export default function KalkulatorPage() {
                     <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${
                       i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100'
                     }`}>
-                      <span className="text-xl">{i === 0 ? '🚌' : i === 1 ? '🚆' : '🚲'}</span>
+                      <span className="text-xl">{MODA_ICONS[i]}</span>
                       <div className="flex-1">
                         <div className="text-sm font-medium text-gray-700">{r.moda}</div>
                         <div className="text-xs text-gray-400">
                           {r.estimasiWaktu} mnt · <span className="text-[#1D9E75]">{r.emisi} kg CO₂</span>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right mr-2">
                         <div className="text-xs text-[#1D9E75] font-medium">Hemat {r.hemat.toFixed(2)} kg</div>
                         <div className="text-xs text-amber-500">+{r.poin} poin</div>
                       </div>
+                      <button
+                        onClick={() => simpanModaAlternatif(MODA_BBM_KEYS[i], r.emisi, r.hemat, r.poin)}
+                        disabled={saving}
+                        className="shrink-0 text-xs bg-[#1D9E75] text-white px-3 py-1.5 rounded-lg hover:bg-[#0F6E56] transition-colors disabled:opacity-50">
+                        Catat
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {saveError && (
+                <div className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  ⚠️ {saveError}
+                </div>
+              )}
+
               {/* Save button */}
-              <button onClick={simpanTrip} disabled={loading}
+              <button onClick={simpanTrip} disabled={saving}
                 className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
                   saved
                     ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
                     : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
                 }`}>
-                {loading ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
+                {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
               </button>
             </div>
           </div>

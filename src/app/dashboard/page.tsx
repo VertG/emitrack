@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { RATA_RATA_NASIONAL } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useRouter } from 'next/navigation'
 
 type Trip = {
@@ -14,6 +14,8 @@ type Trip = {
   bbm: string
   jarak_km: number
   emisi_kg: number
+  emisi_dihemat: number
+  poin_didapat: number
   created_at: string
 }
 
@@ -27,6 +29,14 @@ type Profile = {
 
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
+function sapaanWaktu() {
+  const jam = new Date().getHours()
+  if (jam >= 5 && jam < 11) return 'Selamat pagi'
+  if (jam >= 11 && jam < 15) return 'Selamat siang'
+  if (jam >= 15 && jam < 19) return 'Selamat sore'
+  return 'Selamat malam'
+}
+
 export default function DashboardPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -34,6 +44,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [emisiHariIni, setEmisiHariIni] = useState(0)
   const [chartData, setChartData] = useState<{ hari: string; emisi: number }[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) router.push('/')
@@ -94,9 +105,14 @@ export default function DashboardPage() {
       .single()
 
     if (profileData) setProfile(profileData)
+    setDataLoading(false)
   }
 
   if (loading) return <div className="flex items-center justify-center h-screen text-gray-400">Memuat...</div>
+
+  const totalHematTrips = Number(
+    trips.reduce((a, t) => a + (t.emisi_dihemat ?? 0), 0).toFixed(2)
+  )
 
   const emisiKemarin = trips
     .filter(t => {
@@ -120,7 +136,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
           <div>
             <div className="font-medium text-gray-800">Dashboard</div>
-            <div className="text-xs text-gray-400">Selamat datang, {profile?.username || user?.email?.split('@')[0]}!</div>
+            <div className="text-xs text-gray-400">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
           </div>
           <div className="flex items-center gap-3">
             <span className="bg-[#1D9E75] text-white text-xs px-3 py-1 rounded-full">
@@ -134,6 +150,14 @@ export default function DashboardPage() {
 
         {/* Content */}
         <div className="flex-1 p-6">
+          {dataLoading ? (
+            <div className="flex items-center justify-center h-64 text-gray-300">
+              <div className="text-center">
+                <div className="text-3xl mb-2">🌱</div>
+                <div className="text-sm">Memuat data...</div>
+              </div>
+            </div>
+          ) : (<>
           {/* Stat cards */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
@@ -148,9 +172,9 @@ export default function DashboardPage() {
               },
               {
                 label: 'Total Hemat',
-                val: `${(profile?.total_hemat ?? 0).toFixed(1)} kg`,
+                val: `${totalHematTrips.toFixed(1)} kg`,
                 sub: 'CO₂ tersimpan',
-                extra: `≈ ${Math.floor((profile?.total_hemat ?? 0) / 21)} pohon dewasa`,
+                extra: `≈ ${Math.floor(totalHematTrips / 21)} pohon dewasa`,
                 color: 'text-[#1D9E75]',
               },
               {
@@ -190,7 +214,14 @@ export default function DashboardPage() {
                       formatter={(v) => [`${v} kg CO₂`, 'Emisi']}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: '0.5px solid #e5e7eb' }}
                     />
-                    <Bar dataKey="emisi" fill="#1D9E75" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="emisi" radius={[4, 4, 0, 0]}>
+                        {chartData.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={i === chartData.length - 1 ? '#FAC775' : '#1D9E75'}
+                          />
+                        ))}
+                      </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -224,7 +255,11 @@ export default function DashboardPage() {
                 {trips.slice(0, 5).map(t => (
                   <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">{t.jenis === 'motor' ? '🏍️' : '🚗'}</span>
+                      <span className="text-lg">
+                        {t.jenis === 'motor' ? '🏍️' : t.jenis === 'transportasi_umum'
+                          ? (t.bbm === 'sepeda' ? '🚲' : t.bbm === 'krl' ? '🚆' : '🚌')
+                          : '🚗'}
+                      </span>
                       <div>
                         <div className="text-sm text-gray-700 capitalize">{t.jenis} — {t.bbm}</div>
                         <div className="text-xs text-gray-400">{t.jarak_km} km · {new Date(t.created_at).toLocaleDateString('id-ID')}</div>
@@ -236,6 +271,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          </>)}
         </div>
       </div>
     </div>
