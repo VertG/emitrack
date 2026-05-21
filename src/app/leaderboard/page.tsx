@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { toBlob } from 'html-to-image'
 import { X, Award } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { getUserCity } from '@/lib/location'
+import { showToast } from '@/components/Toast'
 
 type Profile = {
   id: string
@@ -82,6 +83,9 @@ export default function LeaderboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [challengeCount, setChallengeCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  // Track rank changes for arrow indicators
+  const prevRankRef = useRef<Record<string, number>>({})
+  const [flashedIds, setFlashedIds] = useState<Set<string>>(new Set())
 
   // Share Modal State
   const [showShareModal, setShowShareModal] = useState(false)
@@ -95,6 +99,22 @@ export default function LeaderboardPage() {
   useEffect(() => {
     if (authLoading || !user) return
     fetchAll()
+
+    // NOTE: Enable Realtime for the 'profiles' table in Supabase Dashboard:
+    // Table Editor → profiles → ⋯ menu → "Enable Realtime"
+    const channel = supabase
+      .channel('leaderboard-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        () => {
+          fetchAll()
+          showToast('🔄 Leaderboard diperbarui!', 'info')
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [user, authLoading])
 
   // Sort helper — treat null total_hemat as 0
@@ -143,6 +163,19 @@ export default function LeaderboardPage() {
 
     // 1. Global ranking — sort by computed hemat
     const global = sortByHemat(enriched).slice(0, 20)
+
+    // Track rank changes and flash changed rows
+    const newRankMap: Record<string, number> = {}
+    global.forEach((p, i) => { newRankMap[p.id] = i + 1 })
+    const changed = global
+      .filter(p => prevRankRef.current[p.id] !== undefined && prevRankRef.current[p.id] !== newRankMap[p.id])
+      .map(p => p.id)
+    if (changed.length > 0) {
+      setFlashedIds(new Set(changed))
+      setTimeout(() => setFlashedIds(new Set()), 1200)
+    }
+    prevRankRef.current = newRankMap
+
     setAllRanking(global)
 
     // 2. Own profile
@@ -257,7 +290,14 @@ export default function LeaderboardPage() {
         {/* ── Topbar ── */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-4 md:px-6 py-3 md:py-4 bg-white border-b border-gray-100">
           <div>
-            <div className="font-medium text-gray-800">Leaderboard</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-800">Leaderboard</span>
+              {/* LIVE badge */}
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                <span className="text-xs text-red-500 font-medium">LIVE</span>
+              </span>
+            </div>
             <div className="text-xs text-gray-400">Siapa yang paling hijau?</div>
           </div>
           {/* Tab pills */}
@@ -494,13 +534,15 @@ export default function LeaderboardPage() {
                       return (
                         <div
                           key={r.id}
-                          className={`flex items-center gap-3 py-2.5 px-3 rounded-xl transition-colors ${
-                            isMe
+                          className={`flex items-center gap-3 py-2.5 px-3 rounded-xl transition-all duration-300 ${
+                            flashedIds.has(r.id)
+                              ? 'bg-amber-100 border border-amber-300'
+                              : isMe
                               ? 'bg-[#E1F5EE] border border-[#9FE1CB]'
                               : 'bg-gray-50 hover:bg-gray-100'
                           }`}
                         >
-                          {/* Rank number or medal */}
+                          {/* Rank number or medal with change arrow */}
                           <div className="w-7 text-center flex-shrink-0">
                             {i < 3 ? (
                               <span className="text-base leading-none">{MEDALS[i]}</span>
@@ -509,6 +551,13 @@ export default function LeaderboardPage() {
                                 {i + 1}
                               </span>
                             )}
+                            {/* Rank change arrow */}
+                            {(() => {
+                              const prev = prevRankRef.current[r.id]
+                              if (!prev || prev === i + 1) return null
+                              if (prev > i + 1) return <span className="block text-[9px] text-green-500 font-bold leading-none">▲</span>
+                              return <span className="block text-[9px] text-red-400 font-bold leading-none">▼</span>
+                            })()}
                           </div>
 
                           {/* Avatar */}
