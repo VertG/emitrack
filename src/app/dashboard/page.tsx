@@ -46,6 +46,9 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<{ hari: string; emisi: number }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
+  const [editingKota, setEditingKota] = useState(false)
+  const [newKota, setNewKota] = useState('')
+
   useEffect(() => {
     if (!loading && !user) router.push('/')
   }, [user, loading, router])
@@ -128,6 +131,39 @@ export default function DashboardPage() {
 
   const vsRataRata = Number(((emisiHariIni / RATA_RATA_NASIONAL) * 100).toFixed(0))
 
+  const todayStr = new Date().toDateString()
+  const todayTrips = trips.filter(t => new Date(t.created_at).toDateString() === todayStr)
+  
+  const tripHijauHariIni = todayTrips.filter(t => t.jenis === 'transportasi_umum').length
+  const totalHematHariIni = todayTrips.reduce((s, t) => s + (t.emisi_dihemat || 0), 0)
+
+  // Smart Comparison State
+  let smartMsg = ''
+  let smartBtnText = ''
+  let smartBtnLink = ''
+
+  if (todayTrips.length === 0) {
+    smartMsg = 'Belum ada perjalanan hari ini. Mulai catat perjalananmu dan lihat dampak emisimu! 🌱'
+    smartBtnText = 'Catat Perjalanan →'
+    smartBtnLink = '/kalkulator'
+  } else if (tripHijauHariIni > 0) {
+    const pohon = Math.floor(totalHematHariIni / 0.021)
+    smartMsg = `Keren! Kamu sudah hemat ${totalHematHariIni.toFixed(2)} kg CO₂ hari ini dengan memilih transportasi hijau. Setara menanam ${pohon} pohon! 🎉`
+    smartBtnText = 'Lihat Leaderboard →'
+    smartBtnLink = '/leaderboard'
+  } else {
+    // Ada trip kendaraan tapi belum ada trip hijau
+    const hematEstimasi = emisiHariIni * 0.94
+    const pohon = Math.floor(hematEstimasi / 0.021)
+    smartMsg = `Emisi kamu hari ini ${emisiHariIni} kg CO₂. Jika naik TransJakarta, kamu bisa hemat ${hematEstimasi.toFixed(2)} kg CO₂ setara oksigen ${pohon} pohon selama 1 hari! 🌳`
+    smartBtnText = 'Coba Rute Hijau →'
+    smartBtnLink = '/peta'
+  }
+
+  const targetHarian = 3
+  const progressPercent = Math.min((emisiHariIni / targetHarian) * 100, 100)
+  const isOverLimit = emisiHariIni > targetHarian
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
@@ -139,6 +175,33 @@ export default function DashboardPage() {
             <div className="text-xs text-gray-400">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
           </div>
           <div className="flex items-center gap-3">
+            {editingKota ? (
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  value={newKota}
+                  onChange={e => setNewKota(e.target.value)}
+                  className="text-xs px-2 py-1 rounded-full border border-gray-200 outline-none text-gray-700 w-28"
+                  placeholder="Nama kota..."
+                  autoFocus
+                />
+                <button onClick={async () => {
+                  if (!newKota.trim()) { setEditingKota(false); return; }
+                  await supabase.from('profiles').update({ kota: newKota.trim() }).eq('id', user!.id)
+                  setProfile(p => p ? { ...p, kota: newKota.trim() } : null)
+                  setEditingKota(false)
+                }} className="text-xs bg-[#1D9E75] text-white px-3 py-1 rounded-full hover:bg-[#0F6E56]">Simpan</button>
+                <button onClick={() => setEditingKota(false)} className="text-xs text-gray-400 hover:text-gray-600">Batal</button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => { setEditingKota(true); setNewKota(profile?.kota || ''); }}
+                className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1.5 hover:bg-gray-200 transition-colors"
+                title="Ubah kota"
+              >
+                📍 {profile?.kota || 'Memuat...'} <span className="opacity-50">✎</span>
+              </button>
+            )}
             <span className="bg-[#1D9E75] text-white text-xs px-3 py-1 rounded-full">
               🔥 Streak {profile?.streak ?? 0} hari
             </span>
@@ -231,16 +294,35 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-[#E1F5EE] rounded-xl border border-[#9FE1CB] p-4">
-              <div className="text-xs font-medium text-[#085041] mb-3">💡 Smart Comparison</div>
-              <p className="text-sm text-[#0F6E56] leading-relaxed">
-                {emisiHariIni > 0
-                  ? `Emisi kamu hari ini ${emisiHariIni} kg CO₂. Jika naik TransJakarta, kamu bisa hemat hingga ${(emisiHariIni * 0.94).toFixed(2)} kg CO₂!`
-                  : 'Belum ada perjalanan hari ini. Input perjalananmu di Kalkulator untuk melihat perbandingan emisi!'}
-              </p>
-              <a href="/kalkulator"
-                className="inline-flex items-center gap-2 mt-4 bg-[#1D9E75] text-white text-xs px-4 py-2 rounded-lg hover:bg-[#0F6E56] transition-colors">
-                Input Perjalanan →
+            <div className="bg-[#E1F5EE] rounded-xl border border-[#9FE1CB] p-4 flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-medium text-[#085041] mb-3">💡 Smart Comparison</div>
+                <p className="text-sm text-[#0F6E56] leading-relaxed mb-4">
+                  {smartMsg}
+                </p>
+                
+                {/* Progress bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-[10px] text-[#085041] mb-1 font-medium">
+                    <span>Target harian: {targetHarian} kg CO₂</span>
+                    {emisiHariIni === 0 ? (
+                      <span className="text-[#1D9E75]">Hari ini nol emisi! 🌿</span>
+                    ) : (
+                      <span className={isOverLimit ? 'text-red-500' : ''}>{emisiHariIni} kg</span>
+                    )}
+                  </div>
+                  <div className="h-1.5 w-full bg-[#c5eadb] rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${emisiHariIni === 0 ? 'bg-[#1D9E75]' : isOverLimit ? 'bg-red-500' : 'bg-[#1D9E75]'}`}
+                      style={{ width: `${emisiHariIni === 0 ? 100 : progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <a href={smartBtnLink}
+                className="inline-flex items-center gap-2 bg-[#1D9E75] text-white text-xs px-4 py-2 rounded-lg hover:bg-[#0F6E56] transition-colors w-fit">
+                {smartBtnText}
               </a>
             </div>
           </div>

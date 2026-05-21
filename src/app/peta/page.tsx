@@ -1,334 +1,344 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
+import LocationInput, { NominatimResult } from '@/components/LocationInput'
+import { hitungEmisi, rekomendasiRute, Rekomendasi } from '@/lib/emisi'
+import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { rekomendasiRute, hitungEmisi } from '@/lib/emisi'
 
-const LOKASI_PRESET: Record<string, [number, number]> = {
-  'Sudirman, Jakarta': [-6.2088, 106.8228],
-  'Kebayoran Baru, Jakarta': [-6.2441, 106.7955],
-  'Kelapa Gading, Jakarta': [-6.1565, 106.9013],
-  'Depok, Jawa Barat': [-6.4025, 106.7942],
-  'Bekasi, Jawa Barat': [-6.2349, 106.9896],
-  'Tangerang, Banten': [-6.1783, 106.6319],
-  'Bogor, Jawa Barat': [-6.5971, 106.8060],
-  'Bandung, Jawa Barat': [-6.9175, 107.6191],
-  'Politeknik Astra, Bekasi': [-6.3157, 107.1455],
-  'Monas, Jakarta': [-6.1754, 106.8272],
-  'Blok M, Jakarta': [-6.2444, 106.7981],
-  'Grogol, Jakarta': [-6.1676, 106.7884],
-  'Cibubur, Jakarta': [-6.3624, 106.8961],
-}
-
-type Lokasi = { nama: string; koordinat: [number, number] }
-type Rute = { moda: string; emisi: number; estimasiWaktu: number; hemat: number; poin: number; icon: string }
-
-// Ambil rute jalan dari OSRM (gratis, no API key)
-async function ambilRuteOSRM(dari: [number, number], ke: [number, number]) {
-  const [lat1, lon1] = dari
-  const [lat2, lon2] = ke
-  const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`
-  const res = await fetch(url)
-  const data = await res.json()
-  if (data.code !== 'Ok') throw new Error('OSRM error')
-  const route = data.routes[0]
-  return {
-    // Koordinat rute jalan (array [lat, lng] untuk Leaflet)
-    coords: route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]),
-    // Jarak dalam km
-    jarakKm: Number((route.distance / 1000).toFixed(2)),
-    // Durasi dalam menit
-    durasiMenit: Math.round(route.duration / 60),
-  }
-}
+// MapClient must be dynamically imported with ssr: false to avoid window is not defined
+const MapClient = dynamic(() => import('./MapClient'), {
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 rounded-2xl animate-pulse">Memuat Peta...</div>
+})
 
 export default function PetaPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstance = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
-  const polylineRef = useRef<any>(null)
 
-  const [dari, setDari] = useState<Lokasi | null>(null)
-  const [ke, setKe] = useState<Lokasi | null>(null)
-  const [dariInput, setDariInput] = useState('')
-  const [keInput, setKeInput] = useState('')
-  const [dariSaran, setDariSaran] = useState<string[]>([])
-  const [keSaran, setKeSaran] = useState<string[]>([])
-  const [jarak, setJarak] = useState<number | null>(null)
-  const [durasiMobil, setDurasiMobil] = useState<number | null>(null)
-  const [rekomendasi, setRekomendasi] = useState<Rute[]>([])
-  const [mapReady, setMapReady] = useState(false)
-  const [loadingRute, setLoadingRute] = useState(false)
-  const [errorRute, setErrorRute] = useState('')
+  const [asal, setAsal] = useState<NominatimResult | null>(null)
+  const [tujuan, setTujuan] = useState<NominatimResult | null>(null)
+  
+  const [ruteOSRM, setRuteOSRM] = useState<[number, number][] | null>(null)
+  const [jarakKm, setJarakKm] = useState(0)
+  const [durasiMenit, setDurasiMenit] = useState(0)
+  const [osrmError, setOsrmError] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null)
+
+  const [selectedModa, setSelectedModa] = useState<string | null>(null)
+  const [transitRuteOSRM, setTransitRuteOSRM] = useState<[number, number][] | null>(null)
+  const [firstMileOSRM, setFirstMileOSRM] = useState<[number, number][] | null>(null)
+  const [lastMileOSRM, setLastMileOSRM] = useState<[number, number][] | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
   }, [user, authLoading, router])
 
   useEffect(() => {
-    if (mapInstance.current || !mapRef.current) return
+    if (asal && tujuan) {
+      fetchOSRM(asal, tujuan)
+    } else {
+      setRuteOSRM(null)
+      setTransitRuteOSRM(null)
+      setFirstMileOSRM(null)
+      setLastMileOSRM(null)
+      setSelectedModa(null)
+      setJarakKm(0)
+      setDurasiMenit(0)
+      setOsrmError(false)
+    }
+  }, [asal, tujuan])
 
-    import('leaflet').then(L => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      })
-
-      const map = L.map(mapRef.current!, { center: [-6.2088, 106.8456], zoom: 11 })
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map)
-
-      mapInstance.current = map
-      setMapReady(true)
-    })
-
-    return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null } }
-  }, [])
-
-  useEffect(() => {
-    if (!mapReady || !mapInstance.current) return
-
-    import('leaflet').then(async L => {
-      const map = mapInstance.current
-
-      // Hapus markers & polyline lama
-      markersRef.current.forEach(m => m.remove())
-      markersRef.current = []
-      if (polylineRef.current) { polylineRef.current.remove(); polylineRef.current = null }
-      setJarak(null); setRekomendasi([]); setErrorRute('')
-
-      const buatIcon = (warna: string) => L.divIcon({
-        html: `<div style="background:${warna};width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`,
-        className: '', iconSize: [14, 14], iconAnchor: [7, 7],
-      })
-
-      if (dari) {
-        markersRef.current.push(
-          L.marker(dari.koordinat, { icon: buatIcon('#1D9E75') })
-            .addTo(map).bindPopup(`<b>Dari:</b> ${dari.nama}`)
-        )
+  async function fetchOSRM(start: NominatimResult, end: NominatimResult) {
+    try {
+      setOsrmError(false)
+      // OSRM format: lon,lat
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`
+      )
+      const data = await res.json()
+      
+      if (data.code !== 'Ok') {
+        setOsrmError(true)
+        setRuteOSRM(null)
+        // Fallback hitung jarak kasar lurus
+        const R = 6371
+        const dLat = (Number(end.lat) - Number(start.lat)) * Math.PI / 180
+        const dLon = (Number(end.lon) - Number(start.lon)) * Math.PI / 180
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(Number(start.lat) * Math.PI / 180) * Math.cos(Number(end.lat) * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2)
+        const jarakKasar = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        setJarakKm(Number(jarakKasar.toFixed(1)))
+        return
       }
 
-      if (ke) {
-        markersRef.current.push(
-          L.marker(ke.koordinat, { icon: buatIcon('#E24B4A') })
-            .addTo(map).bindPopup(`<b>Ke:</b> ${ke.nama}`)
-        )
-      }
-
-      if (dari && ke) {
-        setLoadingRute(true)
-        try {
-          // Ambil rute jalan sesungguhnya dari OSRM
-          const { coords, jarakKm, durasiMenit } = await ambilRuteOSRM(
-            dari.koordinat, ke.koordinat
-          )
-
-          // Gambar rute jalan di peta
-          const poly = L.polyline(coords, {
-            color: '#1D9E75',
-            weight: 4,
-            opacity: 0.85,
-          }).addTo(map)
-          polylineRef.current = poly
-
-          // Fit bounds ke rute
-          map.fitBounds(poly.getBounds(), { padding: [40, 40] })
-
-          setJarak(jarakKm)
-          setDurasiMobil(durasiMenit)
-
-          // Hitung rekomendasi
-          const emisiMobil = hitungEmisi('mobil', 'pertalite', jarakKm)
-          const rek = rekomendasiRute(emisiMobil, jarakKm)
-          setRekomendasi(rek.map((r, i) => ({ ...r, icon: i === 0 ? '🚌' : i === 1 ? '🚆' : '🚲' })))
-        } catch {
-          setErrorRute('Gagal ambil rute. Cek koneksi internet.')
-          // Fallback: gambar garis lurus
-          const poly = L.polyline([dari.koordinat, ke.koordinat], {
-            color: '#9ca3af', weight: 3, dashArray: '8 6',
-          }).addTo(map)
-          polylineRef.current = poly
-          map.fitBounds([dari.koordinat, ke.koordinat], { padding: [40, 40] })
-        }
-        setLoadingRute(false)
-      }
-    })
-  }, [dari, ke, mapReady])
-
-  function cariLokasi(input: string, setter: (s: string[]) => void) {
-    if (input.length < 2) { setter([]); return }
-    setter(Object.keys(LOKASI_PRESET).filter(k => k.toLowerCase().includes(input.toLowerCase())).slice(0, 5))
+      const route = data.routes[0]
+      // GeoJSON has coordinates as [lon, lat]
+      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number])
+      
+      setRuteOSRM(coords)
+      setJarakKm(Number((route.distance / 1000).toFixed(1)))
+      setDurasiMenit(Math.round(route.duration / 60))
+    } catch (err) {
+      console.error('OSRM fail', err)
+      setOsrmError(true)
+      setRuteOSRM(null)
+    }
   }
 
-  function pilihDari(nama: string) { setDari({ nama, koordinat: LOKASI_PRESET[nama] }); setDariInput(nama); setDariSaran([]) }
-  function pilihKe(nama: string) { setKe({ nama, koordinat: LOKASI_PRESET[nama] }); setKeInput(nama); setKeSaran([]) }
+  // Rekomendasi
+  const asalLatLng: [number, number] | null = asal ? [Number(asal.lat), Number(asal.lon)] : null
+  const tujuanLatLng: [number, number] | null = tujuan ? [Number(tujuan.lat), Number(tujuan.lon)] : null
+
+  const emisiMobil = hitungEmisi('mobil', 'pertalite', jarakKm)
+  const rekomendasi = jarakKm > 0 && asalLatLng && tujuanLatLng
+    ? rekomendasiRute(emisiMobil, jarakKm, asalLatLng[0], asalLatLng[1], tujuanLatLng[0], tujuanLatLng[1]) 
+    : []
+
+  async function handleSelectModa(rec: Rekomendasi) {
+    if (rec.moda === 'Sepeda') {
+      setSelectedModa('Sepeda')
+      setTransitRuteOSRM(null)
+      setFirstMileOSRM(null)
+      setLastMileOSRM(null)
+      return
+    }
+
+    if (selectedModa === rec.moda) {
+       setSelectedModa(null)
+       setTransitRuteOSRM(null)
+       setFirstMileOSRM(null)
+       setLastMileOSRM(null)
+       return
+    }
+
+    setSelectedModa(rec.moda)
+    if (rec.awalLon && rec.awalLat && rec.akhirLon && rec.akhirLat && asalLatLng && tujuanLatLng) {
+      try {
+        const [resTransit, resFirst, resLast] = await Promise.all([
+          fetch(`https://router.project-osrm.org/route/v1/driving/${rec.awalLon},${rec.awalLat};${rec.akhirLon},${rec.akhirLat}?overview=full&geometries=geojson`),
+          fetch(`https://router.project-osrm.org/route/v1/foot/${asalLatLng[1]},${asalLatLng[0]};${rec.awalLon},${rec.awalLat}?overview=full&geometries=geojson`),
+          fetch(`https://router.project-osrm.org/route/v1/foot/${rec.akhirLon},${rec.akhirLat};${tujuanLatLng[1]},${tujuanLatLng[0]}?overview=full&geometries=geojson`)
+        ])
+        
+        const dataTransit = await resTransit.json()
+        const dataFirst = await resFirst.json()
+        const dataLast = await resLast.json()
+
+        if (dataTransit.code === 'Ok') setTransitRuteOSRM(dataTransit.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]]))
+        else setTransitRuteOSRM(null)
+
+        if (dataFirst.code === 'Ok') setFirstMileOSRM(dataFirst.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]]))
+        else setFirstMileOSRM(null)
+
+        if (dataLast.code === 'Ok') setLastMileOSRM(dataLast.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]]))
+        else setLastMileOSRM(null)
+      } catch {
+        setTransitRuteOSRM(null)
+        setFirstMileOSRM(null)
+        setLastMileOSRM(null)
+      }
+    }
+  }
+
+  async function handleSimpanTrip(rec: Rekomendasi) {
+    if (!user) return
+    setIsSaving(true)
+
+    try {
+      const isKendaraanPribadi = rec.moda.includes('Pribadi')
+      const jenisValue = isKendaraanPribadi 
+        ? (rec.moda.toLowerCase().includes('motor') ? 'motor' : 'mobil') 
+        : 'transportasi_umum'
+        
+      const bbmValue = isKendaraanPribadi 
+        ? 'pertalite' // Default asumsi
+        : rec.moda.toLowerCase().includes('sepeda') 
+          ? 'sepeda' 
+          : rec.moda.toLowerCase().includes('krl') ? 'krl' : 'transjakarta'
+
+      const emisiDihemat = isKendaraanPribadi ? 0 : Math.max(0, emisiMobil - rec.emisi)
+
+      const { error: tripErr } = await supabase
+        .from('trips')
+        .insert({
+          user_id: user.id,
+          jenis: jenisValue,
+          bbm: bbmValue,
+          jarak_km: jarakKm,
+          emisi_kg: rec.emisi,
+          emisi_dihemat: Number(emisiDihemat.toFixed(3)),
+          poin_didapat: rec.poin,
+        })
+
+      if (tripErr) throw tripErr
+
+      // Update Profile Poin
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({
+            total_poin: (profile.total_poin ?? 0) + rec.poin,
+            total_hemat: Number(((profile.total_hemat ?? 0) + emisiDihemat).toFixed(2)),
+          })
+          .eq('id', user.id)
+      }
+
+      setToast({ msg: 'Berhasil menyimpan perjalanan hijau!', type: 'success' })
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
+
+    } catch (err: any) {
+      setToast({ msg: 'Gagal menyimpan: ' + err.message, type: 'error' })
+      setTimeout(() => setToast(null), 3000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const activeRec = rekomendasi.find(r => r.moda === selectedModa)
+  const activeTransit = activeRec && activeRec.awalLat && activeRec.akhirLat ? {
+    awalLat: activeRec.awalLat,
+    awalLon: activeRec.awalLon!,
+    akhirLat: activeRec.akhirLat,
+    akhirLon: activeRec.akhirLon!,
+    ruteTransitOSRM: transitRuteOSRM,
+    ruteFirstMileOSRM: firstMileOSRM,
+    ruteLastMileOSRM: lastMileOSRM
+  } : null
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <div className="px-6 py-4 bg-white border-b border-gray-100">
-          <div className="font-medium text-gray-800">Peta & Rute Alternatif</div>
-          <div className="text-xs text-gray-400">Powered by Leaflet + OpenStreetMap + OSRM Routing</div>
-        </div>
-
-        <div className="flex-1 flex gap-0">
-          {/* Panel kiri */}
-          <div className="w-80 bg-white border-r border-gray-100 flex flex-col">
-            <div className="p-4 flex-1 overflow-y-auto">
-
-              {/* Input Dari */}
-              <div className="mb-3 relative">
-                <div className="text-xs text-gray-400 mb-1.5 flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#1D9E75] inline-block"></span> Dari
-                </div>
-                <input type="text" placeholder="Cari lokasi asal..." value={dariInput}
-                  onChange={e => { setDariInput(e.target.value); cariLokasi(e.target.value, setDariSaran) }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#1D9E75]" />
-                {dariSaran.length > 0 && (
-                  <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-lg shadow-md mt-1">
-                    {dariSaran.map(s => (
-                      <button key={s} onClick={() => pilihDari(s)}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                        📍 {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
+      
+      <div className="flex-1 flex p-6 gap-6 h-screen overflow-hidden">
+        {/* PANEL KIRI (Form & Rekomendasi) */}
+        <div className="w-[360px] flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <h1 className="text-lg font-bold text-gray-800 mb-1">Rencanakan Rute</h1>
+            <p className="text-xs text-gray-500 mb-5">Cari rute dan lihat potensi penghematan CO₂.</p>
+            
+            <div className="space-y-4 relative">
+              {/* Garis vertikal penghubung */}
+              <div className="absolute left-2.5 top-8 bottom-8 w-0.5 bg-gray-100 z-0" />
+              
+              <div className="relative z-20 flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-[#E1F5EE] border-2 border-[#1D9E75] flex-shrink-0 mt-6" />
+                <LocationInput label="Titik Asal" placeholder="Cari asal..." value={asal} onChange={setAsal} />
               </div>
 
-              {/* Input Ke */}
-              <div className="mb-4 relative">
-                <div className="text-xs text-gray-400 mb-1.5 flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block"></span> Ke
-                </div>
-                <input type="text" placeholder="Cari lokasi tujuan..." value={keInput}
-                  onChange={e => { setKeInput(e.target.value); cariLokasi(e.target.value, setKeSaran) }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#1D9E75]" />
-                {keSaran.length > 0 && (
-                  <div className="absolute z-10 w-full bg-white border border-gray-100 rounded-lg shadow-md mt-1">
-                    {keSaran.map(s => (
-                      <button key={s} onClick={() => pilihKe(s)}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                        📍 {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="relative z-10 flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-[#fee2e2] border-2 border-[#ef4444] flex-shrink-0 mt-6" />
+                <LocationInput label="Tujuan" placeholder="Cari tujuan..." value={tujuan} onChange={setTujuan} />
               </div>
+            </div>
 
-              {(dari || ke) && (
-                <button onClick={() => { setDari(null); setKe(null); setDariInput(''); setKeInput(''); setJarak(null); setRekomendasi([]) }}
-                  className="text-xs text-gray-400 hover:text-red-400 mb-4 transition-colors">
-                  ✕ Reset lokasi
-                </button>
-              )}
-
-              {/* Loading */}
-              {loadingRute && (
-                <div className="bg-gray-50 rounded-xl p-3 mb-4 text-center text-sm text-gray-400 border border-gray-100">
-                  🔄 Mengambil rute jalan...
-                </div>
-              )}
-
-              {/* Error */}
-              {errorRute && (
-                <div className="bg-red-50 rounded-xl p-3 mb-4 text-xs text-red-500 border border-red-100">
-                  ⚠️ {errorRute}
-                </div>
-              )}
-
-              {/* Hasil */}
-              {jarak !== null && !loadingRute && (
-                <div className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-xs text-gray-400">Jarak jalan</div>
-                      <div className="text-xl font-medium text-[#1D9E75]">{jarak} km</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-400">Waktu mobil</div>
-                      <div className="text-xl font-medium text-gray-700">{durasiMobil} mnt</div>
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-2">via OSRM (rute jalan sesungguhnya)</div>
-                </div>
-              )}
-
-              {/* Rekomendasi */}
-              {rekomendasi.length > 0 && !loadingRute && (
+            {jarakKm > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-medium text-gray-600 mb-2">Pilihan Moda Transportasi</div>
-                  <div className="space-y-2">
-                    {rekomendasi.map((r, i) => (
-                      <div key={i} className={`rounded-xl border p-3 ${i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100 bg-white'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg">{r.icon}</span>
-                          <div className="flex-1 text-sm font-medium text-gray-700">{r.moda}</div>
-                          {i === 0 && <span className="text-[10px] bg-[#1D9E75] text-white px-2 py-0.5 rounded-full">Terhijau</span>}
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <div className="text-center">
-                            <div className="text-xs font-medium text-[#1D9E75]">{r.emisi} kg</div>
-                            <div className="text-[10px] text-gray-400">CO₂</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-xs font-medium text-gray-600">{r.estimasiWaktu} mnt</div>
-                            <div className="text-[10px] text-gray-400">estimasi</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-xs font-medium text-amber-500">+{r.poin} poin</div>
-                            <div className="text-[10px] text-gray-400">reward</div>
-                          </div>
-                        </div>
-                        {r.hemat > 0 && (
-                          <div className="text-[11px] text-[#1D9E75] mt-2">
-                            ✓ Hemat {r.hemat.toFixed(2)} kg CO₂ vs kendaraan pribadi
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                  <div className="text-xs text-gray-500">Estimasi Jarak</div>
+                  <div className="font-semibold text-gray-800">{jarakKm} km</div>
+                </div>
+                {durasiMenit > 0 && (
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">Waktu Tempuh Mobil</div>
+                    <div className="font-semibold text-gray-800">{durasiMenit} menit</div>
                   </div>
-                </div>
-              )}
-
-              {!dari && !ke && (
-                <div className="text-center py-8 text-gray-300">
-                  <div className="text-3xl mb-2">🗺️</div>
-                  <div className="text-sm">Ketik nama lokasi untuk mencari</div>
-                  <div className="text-xs mt-1">Contoh: "Sudirman" atau "Bekasi"</div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-gray-100">
-              <div className="text-xs text-gray-400 leading-relaxed">
-                🗺️ Peta: OpenStreetMap<br/>
-                🛣️ Rute: OSRM (rute jalan asli)<br/>
-                🚌 Rekomendasi: berdasarkan emisi CO₂
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Map */}
-          <div className="flex-1 relative">
-            <div ref={mapRef} className="w-full h-full min-h-[600px]" />
-            {!mapReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                <div className="text-sm text-gray-400">Memuat peta...</div>
+            )}
+            
+            {osrmError && (
+              <div className="mt-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg">
+                Gagal mengambil rute jalan. Menampilkan garis lurus (jarak udara).
               </div>
             )}
           </div>
+
+          {/* REKOMENDASI PANEL */}
+          {jarakKm > 0 && (
+            <div>
+              <div className="text-sm font-bold text-gray-800 mb-3 px-1">Rekomendasi Transportasi Umum</div>
+              <div className="space-y-3">
+                {rekomendasi.map((rec, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => handleSelectModa(rec)}
+                    className={`rounded-xl border p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer ${
+                      selectedModa === rec.moda ? 'bg-[#E1F5EE] border-[#1D9E75]' : 'bg-white border-gray-100 hover:border-[#1D9E75]'
+                    }`}
+                  >
+                    {i === 0 && (
+                      <div className="absolute top-0 right-0 bg-[#FAC775] text-[#085041] text-[10px] font-bold px-3 py-1 rounded-bl-lg">
+                        Terhijau 🌱
+                      </div>
+                    )}
+                    <div className="font-semibold text-gray-800 mb-2 mt-1 flex items-center gap-2">
+                      {rec.moda}
+                    </div>
+
+                    {rec.isTooFar && (
+                      <div className="text-xs text-red-500 font-medium mb-2">
+                        Stasiun terlalu jauh ({(rec.firstMileKm! + rec.lastMileKm!).toFixed(1)} km jalan kaki)
+                      </div>
+                    )}
+                    
+                    {!rec.isTooFar && rec.stasiunAwal && (
+                      <div className="text-[10px] text-gray-500 mb-3 bg-white/50 p-2 rounded border border-gray-100">
+                        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"/> Jalan {rec.firstMileKm} km ke {rec.stasiunAwal}</div>
+                        <div className="flex items-center gap-1.5 border-l border-gray-300 ml-0.5 pl-1.5 my-1 py-1"><span className="text-blue-500 font-bold tracking-widest text-[8px]">|||</span> Transit {rec.transitKm} km</div>
+                        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"/> Jalan {rec.lastMileKm} km ke tujuan</div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                      <div>
+                        <div className="text-gray-400">Emisi</div>
+                        <div className="font-medium text-[#1D9E75]">{rec.emisi} kg CO₂</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400">Hemat vs Mobil</div>
+                        <div className="font-medium text-[#1D9E75]">{rec.hemat} kg CO₂</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400">Waktu Est.</div>
+                        <div className="font-medium text-gray-700">{rec.estimasiWaktu} menit</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400">Reward</div>
+                        <div className="font-medium text-[#FAC775]">+{rec.poin} poin</div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleSimpanTrip(rec); }}
+                      disabled={isSaving || rec.isTooFar}
+                      className="w-full py-2 bg-gray-50 text-[#1D9E75] text-xs font-semibold rounded-lg hover:bg-[#1D9E75] hover:text-white transition-colors disabled:opacity-50 disabled:hover:bg-gray-50 disabled:hover:text-[#1D9E75]"
+                    >
+                      {isSaving ? 'Menyimpan...' : rec.isTooFar ? 'Rute Tidak Valid' : 'Pilih & Simpan Trip'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PANEL KANAN (Map) */}
+        <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden relative">
+          {toast && (
+            <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all ${
+              toast.type === 'success' ? 'bg-[#1D9E75] text-white' : 'bg-red-500 text-white'
+            }`}>
+              {toast.msg}
+            </div>
+          )}
+          <MapClient asal={asalLatLng} tujuan={tujuanLatLng} ruteOSRM={ruteOSRM} activeTransit={activeTransit} />
         </div>
       </div>
     </div>

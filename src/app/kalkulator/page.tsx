@@ -24,6 +24,7 @@ const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
     { value: 'pertalite', label: 'Pertalite' },
     { value: 'pertamax', label: 'Pertamax' },
     { value: 'solar', label: 'Solar' },
+    { value: 'listrik', label: 'Listrik (EV)' },
   ],
 }
 
@@ -53,12 +54,14 @@ export default function KalkulatorPage() {
       .select('total_poin, total_hemat')
       .eq('id', user!.id)
       .single()
-    await supabase.from('profiles').upsert({
-      id: user!.id,
-      total_poin: (profile?.total_poin ?? 0) + tambahPoin,
-      total_hemat: (profile?.total_hemat ?? 0) + tambahHemat,
-      updated_at: new Date().toISOString(),
-    })
+    await supabase
+      .from('profiles')
+      .update({
+        total_poin: (profile?.total_poin ?? 0) + tambahPoin,
+        total_hemat: (profile?.total_hemat ?? 0) + tambahHemat,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user!.id)
   }
 
   async function simpanTrip() {
@@ -67,19 +70,22 @@ export default function KalkulatorPage() {
     setSaved(false)
     setSaveError('')
 
+    // Hitung penghematan vs rata-rata nasional (floored ke 0)
+    const emisiDihemat = Math.max(0, Number((RATA_RATA_NASIONAL - emisiHarian).toFixed(3)))
+
     const { error } = await supabase.from('trips').insert({
       user_id: user.id,
       jenis,
       bbm,
       jarak_km: jarak,
       emisi_kg: emisiHarian,
-      emisi_dihemat: 0,
+      emisi_dihemat: emisiDihemat,
       poin_didapat: 10,
     })
 
     if (error) { setSaveError(error.message); setSaving(false); return }
 
-    await upsertProfile(10, 0)
+    await upsertProfile(10, emisiDihemat)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -130,11 +136,10 @@ export default function KalkulatorPage() {
                 <div className="flex gap-2">
                   {JENIS_KENDARAAN.map(k => (
                     <button key={k.value} onClick={() => { setJenis(k.value); setBbm('pertalite') }}
-                      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        jenis === k.value
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
                           ? 'bg-[#1D9E75] text-white'
                           : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                      }`}>
+                        }`}>
                       {k.value === 'motor' ? '🏍️' : '🚗'} {k.label}
                     </button>
                   ))}
@@ -147,11 +152,10 @@ export default function KalkulatorPage() {
                 <div className="flex gap-2 flex-wrap">
                   {BBM_OPTIONS[jenis].map(b => (
                     <button key={b.value} onClick={() => setBbm(b.value)}
-                      className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${
-                        bbm === b.value
+                      className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${bbm === b.value
                           ? 'bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB]'
                           : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
-                      }`}>
+                        }`}>
                       {b.label}
                     </button>
                   ))}
@@ -217,9 +221,8 @@ export default function KalkulatorPage() {
                 <div className="text-sm font-medium text-gray-700 mb-3">Alternatif Transportasi</div>
                 <div className="space-y-2">
                   {rekomendasi.map((r, i) => (
-                    <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100'
-                    }`}>
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100'
+                      }`}>
                       <span className="text-xl">{MODA_ICONS[i]}</span>
                       <div className="flex-1">
                         <div className="text-sm font-medium text-gray-700">{r.moda}</div>
@@ -250,11 +253,10 @@ export default function KalkulatorPage() {
 
               {/* Save button */}
               <button onClick={simpanTrip} disabled={saving}
-                className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${
-                  saved
+                className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${saved
                     ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
                     : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
-                }`}>
+                  }`}>
                 {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
               </button>
             </div>
