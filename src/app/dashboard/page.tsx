@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { toBlob } from 'html-to-image'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift, Share, X } from 'lucide-react'
+import { getUserCity } from '@/lib/location'
 
 type Trip = {
   id: string
@@ -165,7 +166,16 @@ export default function DashboardPage() {
       .eq('id', user!.id)
       .single()
 
-    if (profileData) setProfile(profileData)
+    if (profileData) {
+      if (!profileData.kota) {
+        // Automatically detect city if not set
+        const detectedCity = await getUserCity()
+        profileData.kota = detectedCity
+        // Save back to Supabase silently
+        supabase.from('profiles').update({ kota: detectedCity }).eq('id', user!.id).then()
+      }
+      setProfile(profileData)
+    }
 
     // Fetch top 3 users for Leaderboard Preview
     const { data: topData } = await supabase
@@ -373,17 +383,15 @@ export default function DashboardPage() {
                         kotaList.map(k => (
                           <button
                             key={k.id}
-                            onClick={() => handleSaveKota(
-                              k.name.replace(/\b\w/g, c => c.toUpperCase())
-                            )}
+                            onClick={() => handleSaveKota(k.name)}
                             disabled={savingKota}
                             className={`w-full text-left text-xs px-3 py-2.5 hover:bg-[#E1F5EE] transition-colors ${
-                              profile?.kota === k.name.replace(/\b\w/g, c => c.toUpperCase())
+                              profile?.kota === k.name
                                 ? 'bg-[#E1F5EE] text-[#085041] font-medium'
                                 : 'text-gray-600'
                             }`}
                           >
-                            {k.name.replace(/\b\w/g, c => c.toUpperCase())}
+                            {k.name}
                           </button>
                         ))
                       )

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import 'leaflet/dist/leaflet.css'
 import { AuthProvider } from '@/context/AuthContext'
+import ToastContainer from '@/components/Toast'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <AuthProvider>
           {children}
+          <ToastContainer />
         </AuthProvider>
       </body>
     </html>
