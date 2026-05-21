@@ -3,8 +3,9 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute, KONSUMSI, FAKTOR_EMISI } from '@/lib/emisi'
+import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute, KONSUMSI, FAKTOR_EMISI, BBM_OPTIONS, LABEL_BBM, CONTOH_MEREK } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
 import { Spinner } from '@/components/Skeleton'
 import { showToast } from '@/components/Toast'
@@ -20,24 +21,27 @@ const JENIS_KENDARAAN = [
 const MODA_BBM_KEYS = ['sepeda', 'krl', 'transjakarta']
 const MODA_ICONS = ['🚲', '🚆', '🚌']
 
-const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  motor: [
-    { value: 'pertalite', label: 'Pertalite' },
-    { value: 'pertamax', label: 'Pertamax' },
-  ],
-  mobil: [
-    { value: 'pertalite', label: 'Pertalite' },
-    { value: 'pertamax', label: 'Pertamax' },
-    { value: 'solar', label: 'Solar' },
-    { value: 'listrik', label: 'Listrik (EV)' },
-  ],
+const HARGA_BBM_DEFAULT: Record<string, number> = {
+  ron90: 10000,
+  ron92: 13000,
+  ron95: 15000,
+  ron98: 16500,
+  diesel48: 6800,
+  diesel51: 14500,
+  diesel53: 15500,
+  listrik: 2500,
 }
 
-const HARGA_BBM_DEFAULT: Record<string, number> = {
-  pertalite: 10000,
-  pertamax: 13000,
-  solar: 6800,
-  listrik: 2500,
+// Nama produk paling populer per RON (untuk label singkat)
+const NAMA_POPULER: Record<string, string> = {
+  ron90:    'Pertalite / Shell Regular',
+  ron92:    'Pertamax / Shell Super',
+  ron95:    'Pertamax Green 95 / Shell V-Power',
+  ron98:    'Pertamax Turbo / Shell V-Power Nitro+',
+  diesel48: 'Biosolar / Solar biasa',
+  diesel51: 'Dexlite / Shell Diesel Extra',
+  diesel53: 'Pertadex / Shell Diesel Premium',
+  listrik:  'Semua merek EV',
 }
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
@@ -48,10 +52,10 @@ const EMISI_TRANSJAKARTA = 0.038
 
 function TabProyeksi() {
   const [jenis, setJenis] = useState('motor')
-  const [bbm, setBbm] = useState('pertalite')
+  const [bbm, setBbm] = useState('ron92')
   const [jarakHarian, setJarakHarian] = useState(20)
   const [hariPerMinggu, setHariPerMinggu] = useState(5)
-  const [hargaBbm, setHargaBbm] = useState(HARGA_BBM_DEFAULT['pertalite'])
+  const [hargaBbm, setHargaBbm] = useState(HARGA_BBM_DEFAULT['ron92'] ?? 13000)
 
   // Sync harga bbm ke default saat bbm berubah
   useEffect(() => {
@@ -60,7 +64,7 @@ function TabProyeksi() {
 
   // Reset bbm jika jenis berubah
   useEffect(() => {
-    setBbm('pertalite')
+    setBbm('ron92')
   }, [jenis])
 
   // ---- Kalkulasi ----
@@ -133,16 +137,34 @@ function TabProyeksi() {
           {/* BBM */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <div className="text-sm font-medium text-gray-700 mb-3">Bahan Bakar</div>
-            <div className="flex gap-2 flex-wrap">
+            <div className={`grid grid-cols-2 ${jenis === 'motor' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-2`}>
               {BBM_OPTIONS[jenis].map(b => (
-                <button key={b.value} onClick={() => setBbm(b.value)}
-                  className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${bbm === b.value
-                    ? 'bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB]'
-                    : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
+                <button key={b} onClick={() => setBbm(b)}
+                  title={CONTOH_MEREK[b]}
+                  className={`group relative p-2 md:p-3 text-left rounded-xl border transition-colors ${bbm === b
+                    ? 'bg-[#E1F5EE] border-[#1D9E75]'
+                    : 'bg-white border-gray-100 hover:bg-gray-50'
                   }`}>
-                  {b.label}
+                  <div className={`text-sm font-bold ${bbm === b ? 'text-[#1D9E75]' : 'text-gray-700'}`}>
+                    {LABEL_BBM[b]}
+                  </div>
+                  <div className={`text-xs truncate mt-0.5 ${bbm === b ? 'text-[#085041]/70' : 'text-gray-400'}`}>
+                    {NAMA_POPULER[b]}
+                  </div>
+                  
+                  {/* Tooltip on Hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-[#085041] text-white text-xs rounded-lg p-2.5 z-10 shadow-lg pointer-events-none">
+                    Berlaku untuk: {CONTOH_MEREK[b]}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#085041]"></div>
+                  </div>
                 </button>
               ))}
+            </div>
+            <div className="mt-4 text-xs text-gray-400">
+              <Link href="/edukasi" className="hover:text-[#1D9E75] hover:underline flex items-start gap-1.5">
+                <span className="shrink-0 font-bold">ⓘ</span>
+                <span className="leading-relaxed">RON (Research Octane Number) adalah standar internasional yang berlaku untuk semua merek — Pertamina, Shell, Vivo, BP, Total, dll.</span>
+              </Link>
             </div>
           </div>
 
@@ -319,7 +341,7 @@ function KalkulatorContent() {
   const dariPeta = searchParams.get('dari-peta') === '1'
   const [jenis, setJenis] = useState(jenisDariUrl === 'mobil' ? 'mobil' : 'motor')
   const [jarak, setJarak] = useState(jarakDariUrl ? Number(jarakDariUrl) : 20)
-  const [bbm, setBbm] = useState('pertalite')
+  const [bbm, setBbm] = useState('ron92')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -490,7 +512,7 @@ function KalkulatorContent() {
                   <div className="text-sm font-medium text-gray-700 mb-3">Jenis Kendaraan</div>
                   <div className="flex gap-2">
                     {JENIS_KENDARAAN.map(k => (
-                      <button key={k.value} onClick={() => { setJenis(k.value); setBbm('pertalite') }}
+                      <button key={k.value} onClick={() => { setJenis(k.value); setBbm('ron92') }}
                         className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
                           ? 'bg-[#1D9E75] text-white'
                           : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
@@ -504,16 +526,34 @@ function KalkulatorContent() {
                 {/* Bahan bakar */}
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="text-sm font-medium text-gray-700 mb-3">Bahan Bakar</div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className={`grid grid-cols-2 ${jenis === 'motor' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-2`}>
                     {BBM_OPTIONS[jenis].map(b => (
-                      <button key={b.value} onClick={() => setBbm(b.value)}
-                        className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${bbm === b.value
-                          ? 'bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB]'
-                          : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
-                          }`}>
-                        {b.label}
+                      <button key={b} onClick={() => setBbm(b)}
+                        title={CONTOH_MEREK[b]}
+                        className={`group relative p-2 md:p-3 text-left rounded-xl border transition-colors ${bbm === b
+                          ? 'bg-[#E1F5EE] border-[#1D9E75]'
+                          : 'bg-white border-gray-100 hover:bg-gray-50'
+                        }`}>
+                        <div className={`text-sm font-bold ${bbm === b ? 'text-[#1D9E75]' : 'text-gray-700'}`}>
+                          {LABEL_BBM[b]}
+                        </div>
+                        <div className={`text-xs truncate mt-0.5 ${bbm === b ? 'text-[#085041]/70' : 'text-gray-400'}`}>
+                          {NAMA_POPULER[b]}
+                        </div>
+
+                        {/* Tooltip on Hover */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-[#085041] text-white text-xs rounded-lg p-2.5 z-10 shadow-lg pointer-events-none">
+                          Berlaku untuk: {CONTOH_MEREK[b]}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#085041]"></div>
+                        </div>
                       </button>
                     ))}
+                  </div>
+                  <div className="mt-4 text-xs text-gray-400">
+                    <Link href="/edukasi" className="hover:text-[#1D9E75] hover:underline flex items-start gap-1.5">
+                      <span className="shrink-0 font-bold">ⓘ</span>
+                      <span className="leading-relaxed">RON (Research Octane Number) adalah standar internasional yang berlaku untuk semua merek — Pertamina, Shell, Vivo, BP, Total, dll.</span>
+                    </Link>
                   </div>
                 </div>
 

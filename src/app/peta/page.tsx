@@ -113,7 +113,7 @@ export default function PetaPage() {
   const asalLatLng: [number, number] | null = asal ? [Number(asal.lat), Number(asal.lon)] : null
   const tujuanLatLng: [number, number] | null = tujuan ? [Number(tujuan.lat), Number(tujuan.lon)] : null
 
-  const emisiMobil = hitungEmisi('mobil', 'pertalite', jarakKm)
+  const emisiMobil = hitungEmisi('mobil', 'ron92', jarakKm)
   const rekomendasi = jarakKm > 0 && asalLatLng && tujuanLatLng
     ? rekomendasiRute(emisiMobil, jarakKm, asalLatLng[0], asalLatLng[1], tujuanLatLng[0], tujuanLatLng[1])
     : []
@@ -178,7 +178,7 @@ export default function PetaPage() {
         : 'transportasi_umum'
 
       const bbmValue = isKendaraanPribadi
-        ? 'pertalite' // Default asumsi
+        ? 'ron92' // Default asumsi
         : rec.moda.toLowerCase().includes('sepeda')
           ? 'sepeda'
           : rec.moda.toLowerCase().includes('krl') ? 'krl' : 'transjakarta'

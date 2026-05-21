@@ -1,20 +1,80 @@
 // Faktor emisi (kg CO₂ per liter) — sumber IPCC 2021 + ESDM RI
 import { findNearestStation, canTransfer } from './stations'
+// Faktor emisi (kg CO₂ per liter) — sumber IPCC 2021
+// Nilai berdasarkan kandungan karbon, tidak berbeda antar merek
 export const FAKTOR_EMISI: Record<string, number> = {
-  pertalite: 2.31,
-  pertamax: 2.35,
-  solar: 2.67,
-  listrik: 0.85, // kg CO₂ per kWh (grid Indonesia)
+  ron90:   2.30,  // Pertalite, Shell Regular, Vivo Revvo 90, dll
+  ron92:   2.31,  // Pertamax, Shell Super, Total Performance 92, dll
+  ron95:   2.33,  // Pertamax Green 95, Shell V-Power, Total Performance 95, dll
+  ron98:   2.35,  // Pertamax Turbo, Shell V-Power Nitro+, dll
+  diesel48: 2.67, // Biosolar (CN48), Solar biasa
+  diesel51: 2.65, // Dexlite (CN51)
+  diesel53: 2.63, // Pertadex, Shell Diesel, (CN53)
+  listrik:  0.85, // kWh — grid Indonesia (RUPTL PLN 2023)
 }
 
-// Konsumsi bahan bakar rata-rata (liter/km) — data ESDM RI
+// Konsumsi rata-rata (liter/km) — sumber ESDM RI + BPPT
+// RON lebih tinggi = efisiensi sedikit lebih baik
 export const KONSUMSI: Record<string, number> = {
-  motor_pertalite: 0.043,
-  motor_pertamax: 0.040,
-  mobil_pertalite: 0.120,
-  mobil_pertamax: 0.115,
-  mobil_solar: 0.095,
-  mobil_listrik: 0.180, // kWh/km
+  // Motor
+  motor_ron90:    0.045,
+  motor_ron92:    0.043,
+  motor_ron95:    0.041,
+  motor_ron98:    0.040,
+  motor_listrik:  0.020, // kWh/km
+
+  // Mobil bensin
+  mobil_ron90:    0.125,
+  mobil_ron92:    0.120,
+  mobil_ron95:    0.115,
+  mobil_ron98:    0.110,
+
+  // Mobil diesel
+  mobil_diesel48: 0.095,
+  mobil_diesel51: 0.092,
+  mobil_diesel53: 0.090,
+
+  // Mobil listrik
+  mobil_listrik:  0.180, // kWh/km
+}
+
+// Label display untuk setiap opsi BBM
+export const LABEL_BBM: Record<string, string> = {
+  ron90:    'RON 90',
+  ron92:    'RON 92',
+  ron95:    'RON 95',
+  ron98:    'RON 98',
+  diesel48: 'Solar (CN 48)',
+  diesel51: 'Dexlite (CN 51)',
+  diesel53: 'Diesel Premium (CN 53)',
+  listrik:  'Listrik',
+  // Fallbacks for legacy data in DB
+  pertalite: 'RON 90 (Pertalite)',
+  pertamax:  'RON 92 (Pertamax)',
+  solar:     'Solar (CN 48)',
+}
+
+// Contoh merek per RON (untuk tooltip/info)
+export const CONTOH_MEREK: Record<string, string> = {
+  ron90:    'Pertalite, Shell Regular, Vivo Revvo 90',
+  ron92:    'Pertamax, Shell Super, Total Performance 92, BP 92',
+  ron95:    'Pertamax Green 95, Shell V-Power, Total Eco Plus',
+  ron98:    'Pertamax Turbo, Shell V-Power Nitro+',
+  diesel48: 'Biosolar, Solar subsidi',
+  diesel51: 'Dexlite, Shell Diesel Extra',
+  diesel53: 'Pertadex, Shell Diesel Premium',
+  listrik:  'Semua kendaraan listrik',
+  // Fallbacks for legacy data
+  pertalite: 'Pertalite, Shell Regular, Vivo Revvo 90',
+  pertamax:  'Pertamax, Shell Super, Total Performance 92, BP 92',
+  solar:     'Biosolar, Solar subsidi',
+}
+
+// Opsi BBM per jenis kendaraan
+export const BBM_OPTIONS: Record<string, string[]> = {
+  motor: ['ron90', 'ron92', 'ron95', 'ron98', 'listrik'],
+  mobil: ['ron90', 'ron92', 'ron95', 'ron98', 
+          'diesel48', 'diesel51', 'diesel53', 'listrik'],
 }
 
 // Rata-rata emisi nasional per hari (kg CO₂)
@@ -32,7 +92,7 @@ export function hitungEmisi(jenis: string, bbm: string, jarakKm: number): number
   
   // Normalisasi string untuk mencegah typo atau spasi tersembunyi
   const jenisSafe = (jenis || 'motor').toLowerCase().replace(' pribadi', '').trim(); 
-  const bbmSafe = (bbm || 'pertalite').toLowerCase().trim();
+  const bbmSafe = (bbm || 'ron92').toLowerCase().trim();
   
   const key = `${jenisSafe}_${bbmSafe}`;
   
@@ -312,7 +372,7 @@ export function rekomendasiRute(
   })
 
   // Tambahkan opsi kendaraan pribadi agar user tetap bisa mencatatnya
-  const emisiMotor = hitungEmisi('motor', 'pertalite', jarakKm)
+  const emisiMotor = hitungEmisi('motor', 'ron92', jarakKm)
   results.push({
     moda: 'Motor Pribadi',
     emisi: emisiMotor,
@@ -321,8 +381,8 @@ export function rekomendasiRute(
     poin: POIN_REWARD['Motor Pribadi'],
   })
 
-  // Mobil Pribadi: emisi = emisi referensi mobil pertalite
-  const emisiMobil = hitungEmisi('mobil', 'pertalite', jarakKm)
+  // Mobil Pribadi: emisi = emisi referensi mobil ron92
+  const emisiMobil = hitungEmisi('mobil', 'ron92', jarakKm)
   results.push({
     moda: 'Mobil Pribadi',
     emisi: emisiMobil,

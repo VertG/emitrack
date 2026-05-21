@@ -10,6 +10,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'EmiTrack — Jejak Emisimu, Aksimu',
   description: 'Platform pelacak emisi kendaraan berbasis gamifikasi untuk mobilitas perkotaan berkelanjutan',
+  icons: {
+    icon: '/EmiTrackLogo3.png',
+    apple: '/EmiTrackLogo3.png',
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

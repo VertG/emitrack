@@ -21,7 +21,10 @@ export async function getUserCity(fallbackCity?: string): Promise<string> {
                                 data.address?.municipality || 
                                 data.address?.county || 
                                 data.address?.state_district || 
-                                data.address?.town
+                                data.address?.town ||
+                                data.address?.village ||
+                                data.address?.suburb ||
+                                data.address?.state
               if (foundCity) {
                 resolve(toTitleCase(foundCity.trim()))
               } else {
@@ -38,7 +41,7 @@ export async function getUserCity(fallbackCity?: string): Promise<string> {
       return city
     } catch (err) {
       // If geolocation fails or is denied, fall through to IP detection
-      console.warn('Geolocation failed, falling back to IP:', err)
+      // Silent fallback to avoid console spam
     }
   }
 

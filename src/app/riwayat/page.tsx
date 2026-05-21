@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { FAKTOR_EMISI, KONSUMSI, LABEL_BBM, CONTOH_MEREK } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
 import { SkeletonRow } from '@/components/Skeleton'
 
@@ -23,36 +24,16 @@ type FilterJenis = 'semua' | 'kendaraan' | 'umum'
 type FilterPeriode = '7' | '30' | 'semua'
 type SortBy = 'terbaru' | 'terlama' | 'emisi_besar' | 'emisi_kecil'
 
-const MODA_LABEL: Record<string, string> = {
-  motor: 'Motor',
-  mobil: 'Mobil',
+const MODA_UMUM_LABEL: Record<string, string> = {
   transjakarta: 'TransJakarta',
   krl: 'KRL',
   sepeda: 'Sepeda',
-  pertalite: 'Pertalite',
-  pertamax: 'Pertamax',
-  solar: 'Solar',
-  listrik: 'Listrik (EV)',
 }
 
 const JENIS_ICON: Record<string, string> = {
   motor: '🏍️',
   mobil: '🚗',
   transportasi_umum: '🚌',
-}
-
-// Emission formula constants
-const FAKTOR_EMISI: Record<string, number> = {
-  pertalite: 2.31,
-  pertamax: 2.35,
-  solar: 2.67,
-}
-const KONSUMSI: Record<string, number> = {
-  motor_pertalite: 0.043,
-  motor_pertamax: 0.043,
-  mobil_pertalite: 0.120,
-  mobil_pertamax: 0.115,
-  mobil_solar: 0.095,
 }
 
 const PAGE_SIZE = 10
@@ -78,7 +59,7 @@ function getJenisLabel(trip: Trip) {
 }
 
 function getBbmLabel(trip: Trip) {
-  return MODA_LABEL[trip.bbm] ?? trip.bbm
+  return LABEL_BBM[trip.bbm] ?? MODA_UMUM_LABEL[trip.bbm] ?? trip.bbm
 }
 
 // ─────────────────────────────────────────────
@@ -139,6 +120,7 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
                 { label: 'Jarak Tempuh', val: `${trip.jarak_km} km` },
                 { label: 'Jenis Kendaraan', val: getJenisLabel(trip) },
                 { label: isUmum ? 'Moda Transit' : 'Bahan Bakar', val: getBbmLabel(trip) },
+                ...(isKendaraan && CONTOH_MEREK[trip.bbm] ? [{ label: 'Contoh Merek', val: CONTOH_MEREK[trip.bbm] }] : []),
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
                   <span className="text-sm text-gray-500">{item.label}</span>
@@ -432,26 +414,28 @@ export default function RiwayatPage() {
                     <div
                       key={trip.id}
                       onClick={() => setSelectedTrip(trip)}
-                      className="flex items-center gap-4 px-5 py-4 hover:bg-[#E1F5EE]/40 transition-colors cursor-pointer group"
+                      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-5 py-4 hover:bg-[#E1F5EE]/40 transition-colors cursor-pointer group"
                     >
-                      {/* Icon */}
-                      <div className="text-2xl shrink-0">{JENIS_ICON[trip.jenis] ?? '🚗'}</div>
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        {/* Icon */}
+                        <div className="text-2xl shrink-0">{JENIS_ICON[trip.jenis] ?? '🚗'}</div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
-                          {getJenisLabel(trip)} — {getBbmLabel(trip)}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          {trip.jarak_km} km · {formatDateTime(trip.created_at)}
-                        </div>
-                        <div className="text-[10px] text-[#1D9E75] mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          Lihat detail →
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-800 truncate">
+                            {getJenisLabel(trip)} — {getBbmLabel(trip)}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5 truncate">
+                            {trip.jarak_km} km · {formatDateTime(trip.created_at)}
+                          </div>
+                          <div className="text-[10px] text-[#1D9E75] mt-1 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
+                            Lihat detail →
+                          </div>
                         </div>
                       </div>
 
                       {/* Badges */}
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      <div className="flex items-center gap-2 sm:shrink-0 flex-wrap sm:justify-end pl-[3.25rem] sm:pl-0 mt-1 sm:mt-0">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                           trip.jenis === 'transportasi_umum'
                             ? 'bg-[#E1F5EE] text-[#085041]'
@@ -468,7 +452,7 @@ export default function RiwayatPage() {
                           +{trip.poin_didapat} poin
                         </span>
                         {/* Chevron hint */}
-                        <span className="text-gray-300 group-hover:text-[#1D9E75] transition-colors text-sm">›</span>
+                        <span className="text-gray-300 group-hover:text-[#1D9E75] transition-colors text-sm hidden sm:inline">›</span>
                       </div>
                     </div>
                   ))}

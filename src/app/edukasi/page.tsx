@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { hitungEmisi } from '@/lib/emisi'
+import { hitungEmisi, BBM_OPTIONS, LABEL_BBM } from '@/lib/emisi'
 import { Info, Leaf, Car, Trees, TrendingUp, AlertTriangle, Bus, Bike, Wind, PowerOff, Users, Zap, Globe, Target } from 'lucide-react'
 
 export default function EdukasiPage() {
@@ -14,7 +14,7 @@ export default function EdukasiPage() {
   // Interactive Calculator State
   const [jarak, setJarak] = useState<number>(20)
   const [jenis, setJenis] = useState<'motor' | 'mobil'>('motor')
-  const [bbm, setBbm] = useState<'pertalite' | 'pertamax' | 'solar'>('pertalite')
+  const [bbm, setBbm] = useState<string>('ron92')
   const [hasilEmisi, setHasilEmisi] = useState<number>(0)
 
   useEffect(() => {
@@ -134,15 +134,31 @@ export default function EdukasiPage() {
                       Faktor Emisi
                     </div>
                     <div className="text-xs text-gray-500 ml-8 space-y-1">
-                      <div>Jumlah CO₂ per liter BBM:</div>
-                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1 pt-1">
-                        <span>Pertalite</span> <span className="font-medium text-gray-700">2.31 kg CO₂</span>
+                      <div className="font-medium text-gray-700">Bensin (kg CO₂/liter):</div>
+                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1">
+                        <span>RON 90</span> <span className="font-medium text-gray-700">2.30</span>
                       </div>
                       <div className="flex justify-between border-b border-dashed border-gray-100 pb-1 pt-1">
-                        <span>Pertamax</span> <span className="font-medium text-gray-700">2.35 kg CO₂</span>
+                        <span>RON 92</span> <span className="font-medium text-gray-700">2.31</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1 pt-1">
+                        <span>RON 95</span> <span className="font-medium text-gray-700">2.33</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1 pt-1">
+                        <span>RON 98</span> <span className="font-medium text-gray-700">2.35</span>
+                      </div>
+                      <div className="font-medium text-gray-700 mt-2">Diesel (kg CO₂/liter):</div>
+                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1">
+                        <span>CN 48 (Solar)</span> <span className="font-medium text-gray-700">2.67</span>
+                      </div>
+                      <div className="flex justify-between border-b border-dashed border-gray-100 pb-1 pt-1">
+                        <span>CN 51 (Dexlite)</span> <span className="font-medium text-gray-700">2.65</span>
                       </div>
                       <div className="flex justify-between pt-1">
-                        <span>Solar</span> <span className="font-medium text-gray-700">2.67 kg CO₂</span>
+                        <span>CN 53 (Premium)</span> <span className="font-medium text-gray-700">2.63</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-2 italic leading-tight">
+                        *RON (Research Octane Number) adalah standar internasional yang berlaku untuk semua merek BBM — Pertamina, Shell, Vivo, BP, Total, dll.
                       </div>
                     </div>
                   </div>
@@ -190,7 +206,7 @@ export default function EdukasiPage() {
                       <label className="block text-xs font-medium text-gray-500 mb-1">Kendaraan</label>
                       <select 
                         value={jenis} 
-                        onChange={e => setJenis(e.target.value as 'motor' | 'mobil')}
+                        onChange={e => { setJenis(e.target.value as 'motor' | 'mobil'); setBbm('ron92') }}
                         className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D9E75]/30"
                       >
                         <option value="motor">Motor</option>
@@ -201,12 +217,12 @@ export default function EdukasiPage() {
                       <label className="block text-xs font-medium text-gray-500 mb-1">BBM</label>
                       <select 
                         value={bbm} 
-                        onChange={e => setBbm(e.target.value as 'pertalite' | 'pertamax' | 'solar')}
+                        onChange={e => setBbm(e.target.value)}
                         className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D9E75]/30"
                       >
-                        <option value="pertalite">Pertalite</option>
-                        <option value="pertamax">Pertamax</option>
-                        {jenis === 'mobil' && <option value="solar">Solar</option>}
+                        {BBM_OPTIONS[jenis].map(b => (
+                          <option key={b} value={b}>{LABEL_BBM[b]}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -214,7 +230,7 @@ export default function EdukasiPage() {
 
                 <div className="bg-[#E1F5EE] rounded-xl p-5 text-center border border-[#9FE1CB]">
                   <div className="text-xs text-[#085041] mb-2 font-medium leading-relaxed">
-                    Jarak <span className="font-bold">{jarak} km</span> dengan <span className="font-bold capitalize">{jenis} {bbm}</span> menghasilkan:
+                    Jarak <span className="font-bold">{jarak} km</span> dengan <span className="font-bold capitalize">{jenis}</span> <span className="font-bold">{LABEL_BBM[bbm]}</span> menghasilkan:
                   </div>
                   <div className="text-3xl font-black text-[#1D9E75]">
                     {hasilEmisi.toFixed(2)} <span className="text-sm font-bold">kg CO₂</span>

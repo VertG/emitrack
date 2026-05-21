@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function NotFound() {
   return (
@@ -9,7 +10,15 @@ export default function NotFound() {
 
       <div className="relative z-10 max-w-md w-full">
         {/* Icon */}
-        <div className="text-6xl mb-2 animate-bounce select-none">🌿</div>
+        <div className="mb-2 animate-bounce select-none">
+          <Image 
+            src="/EmiTrackLogo3.png" 
+            alt="EmiTrack" 
+            width={80} 
+            height={80} 
+            className="object-contain mx-auto opacity-40"
+          />
+        </div>
 
         {/* 404 */}
         <h1 className="text-8xl font-bold text-[#1D9E75] leading-none mb-4 tracking-tight">

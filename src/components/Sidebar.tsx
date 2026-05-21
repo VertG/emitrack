@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
@@ -32,8 +33,13 @@ export default function Sidebar() {
       <div className="hidden md:flex w-52 h-screen sticky top-0 bg-gray-50 border-r border-gray-100 flex-col shrink-0">
         {/* Logo */}
         <div className="px-4 py-5 border-b border-gray-100 shrink-0">
-          <div className="text-[#1D9E75] text-lg font-semibold">EmiTrack</div>
-          <div className="text-gray-400 text-[10px] tracking-widest">JEJAK EMISIMU</div>
+          <Image 
+            src="/EmiTrackLogo1.png" 
+            alt="EmiTrack" 
+            width={110} 
+            height={36} 
+            className="object-contain"
+          />
         </div>
 
         {/* Nav — scrollable if needed */}
@@ -55,15 +61,15 @@ export default function Sidebar() {
           <div className="mx-4 my-3 border-t border-gray-100" />
           <div className="text-[10px] text-gray-400 tracking-widest px-4 py-2 uppercase">Lainnya</div>
 
-          {/* Dashboard Publik */}
-          <Link href="/publik"
+          {/* Beranda */}
+          <Link href="/"
             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors border-l-2 ${
-              pathname === '/publik'
+              pathname === '/'
                 ? 'text-[#1D9E75] bg-white border-[#1D9E75] font-medium'
                 : 'text-gray-500 border-transparent hover:bg-white hover:text-gray-700'
             }`}>
-            <span>🌍</span>
-            Dashboard Publik
+            <span>🏠</span>
+            Beranda
           </Link>
 
           {/* Profil */}
