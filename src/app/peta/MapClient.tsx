@@ -66,12 +66,24 @@ function FitBounds({ rute }: { rute: [number, number][] }) {
   return null
 }
 
+// Komponen untuk mengupdate view peta tanpa remount MapContainer
+function MapController({ asal }: { asal: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (asal) {
+      map.setView(asal, map.getZoom())
+    }
+  }, [map, asal])
+  return null
+}
+
 export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit }: MapClientProps) {
-  const center: [number, number] = asal || [-6.2088, 106.8456] // Default Jakarta
+  // Center TIDAK boleh berubah di MapContainer — update dilakukan via MapController
+  const DEFAULT_CENTER: [number, number] = [-6.2088, 106.8456]
 
   return (
     <MapContainer
-      center={center}
+      center={DEFAULT_CENTER}
       zoom={11}
       scrollWheelZoom={true}
       className="w-full h-full rounded-2xl shadow-sm z-0"
@@ -80,6 +92,9 @@ export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit }: Map
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      
+      {/* Update view saat asal berubah tanpa remount MapContainer */}
+      <MapController asal={asal} />
       
       {asal && <Marker position={asal} icon={greenIcon} />}
       {tujuan && <Marker position={tujuan} icon={redIcon} />}

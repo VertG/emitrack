@@ -22,7 +22,7 @@ export default function PetaPage() {
 
   const [asal, setAsal] = useState<NominatimResult | null>(null)
   const [tujuan, setTujuan] = useState<NominatimResult | null>(null)
-  
+
   const [ruteOSRM, setRuteOSRM] = useState<[number, number][] | null>(null)
   const [jarakKm, setJarakKm] = useState(0)
   const [durasiMenit, setDurasiMenit] = useState(0)
@@ -55,6 +55,20 @@ export default function PetaPage() {
     }
   }, [asal, tujuan])
 
+  // 1. Ambil data dari memory saat halaman Peta dimuat
+  useEffect(() => {
+    const savedAsal = sessionStorage.getItem('petaAsal');
+    const savedTujuan = sessionStorage.getItem('petaTujuan');
+    if (savedAsal) setAsal(JSON.parse(savedAsal));
+    if (savedTujuan) setTujuan(JSON.parse(savedTujuan));
+  }, []);
+
+  // 2. Simpan data ke memory setiap kali user memilih lokasi baru
+  useEffect(() => {
+    if (asal) sessionStorage.setItem('petaAsal', JSON.stringify(asal));
+    if (tujuan) sessionStorage.setItem('petaTujuan', JSON.stringify(tujuan));
+  }, [asal, tujuan]);
+
   async function fetchOSRM(start: NominatimResult, end: NominatimResult) {
     setIsFetchingRoute(true)
     try {
@@ -64,7 +78,7 @@ export default function PetaPage() {
         `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`
       )
       const data = await res.json()
-      
+
       if (data.code !== 'Ok') {
         setOsrmError(true)
         setRuteOSRM(null)
@@ -72,8 +86,8 @@ export default function PetaPage() {
         const R = 6371
         const dLat = (Number(end.lat) - Number(start.lat)) * Math.PI / 180
         const dLon = (Number(end.lon) - Number(start.lon)) * Math.PI / 180
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(Number(start.lat) * Math.PI / 180) * Math.cos(Number(end.lat) * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2)
-        const jarakKasar = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Number(start.lat) * Math.PI / 180) * Math.cos(Number(end.lat) * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        const jarakKasar = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         setJarakKm(Number(jarakKasar.toFixed(1)))
         return
       }
@@ -81,7 +95,7 @@ export default function PetaPage() {
       const route = data.routes[0]
       // GeoJSON has coordinates as [lon, lat]
       const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number])
-      
+
       setRuteOSRM(coords)
       setJarakKm(Number((route.distance / 1000).toFixed(1)))
       setDurasiMenit(Math.round(route.duration / 60))
@@ -100,7 +114,7 @@ export default function PetaPage() {
 
   const emisiMobil = hitungEmisi('mobil', 'pertalite', jarakKm)
   const rekomendasi = jarakKm > 0 && asalLatLng && tujuanLatLng
-    ? rekomendasiRute(emisiMobil, jarakKm, asalLatLng[0], asalLatLng[1], tujuanLatLng[0], tujuanLatLng[1]) 
+    ? rekomendasiRute(emisiMobil, jarakKm, asalLatLng[0], asalLatLng[1], tujuanLatLng[0], tujuanLatLng[1])
     : []
 
   async function handleSelectModa(rec: Rekomendasi) {
@@ -113,11 +127,11 @@ export default function PetaPage() {
     }
 
     if (selectedModa === rec.moda) {
-       setSelectedModa(null)
-       setTransitRuteOSRM(null)
-       setFirstMileOSRM(null)
-       setLastMileOSRM(null)
-       return
+      setSelectedModa(null)
+      setTransitRuteOSRM(null)
+      setFirstMileOSRM(null)
+      setLastMileOSRM(null)
+      return
     }
 
     setSelectedModa(rec.moda)
@@ -129,7 +143,7 @@ export default function PetaPage() {
           fetch(`https://router.project-osrm.org/route/v1/foot/${asalLatLng[1]},${asalLatLng[0]};${rec.awalLon},${rec.awalLat}?overview=full&geometries=geojson`),
           fetch(`https://router.project-osrm.org/route/v1/foot/${rec.akhirLon},${rec.akhirLat};${tujuanLatLng[1]},${tujuanLatLng[0]}?overview=full&geometries=geojson`)
         ])
-        
+
         const dataTransit = await resTransit.json()
         const dataFirst = await resFirst.json()
         const dataLast = await resLast.json()
@@ -158,14 +172,14 @@ export default function PetaPage() {
 
     try {
       const isKendaraanPribadi = rec.moda.includes('Pribadi')
-      const jenisValue = isKendaraanPribadi 
-        ? (rec.moda.toLowerCase().includes('motor') ? 'motor' : 'mobil') 
+      const jenisValue = isKendaraanPribadi
+        ? (rec.moda.toLowerCase().includes('motor') ? 'motor' : 'mobil')
         : 'transportasi_umum'
-        
-      const bbmValue = isKendaraanPribadi 
+
+      const bbmValue = isKendaraanPribadi
         ? 'pertalite' // Default asumsi
-        : rec.moda.toLowerCase().includes('sepeda') 
-          ? 'sepeda' 
+        : rec.moda.toLowerCase().includes('sepeda')
+          ? 'sepeda'
           : rec.moda.toLowerCase().includes('krl') ? 'krl' : 'transjakarta'
 
       const emisiDihemat = isKendaraanPribadi ? 0 : Math.max(0, emisiMobil - rec.emisi)
@@ -223,7 +237,7 @@ export default function PetaPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      
+
       <div className="flex-1 flex p-6 gap-6 h-screen overflow-hidden">
         {/* PANEL KIRI (Form & Rekomendasi) */}
         <div className="w-[360px] flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
@@ -233,11 +247,11 @@ export default function PetaPage() {
               {isFetchingRoute && <Spinner className="w-5 h-5 text-[#1D9E75]" />}
             </div>
             <p className="text-xs text-gray-500 mb-5">Cari rute dan lihat potensi penghematan CO₂.</p>
-            
+
             <div className="space-y-4 relative">
               {/* Garis vertikal penghubung */}
               <div className="absolute left-2.5 top-8 bottom-8 w-0.5 bg-gray-100 z-0" />
-              
+
               <div className="relative z-20 flex items-start gap-3">
                 <div className="w-5 h-5 rounded-full bg-[#E1F5EE] border-2 border-[#1D9E75] flex-shrink-0 mt-6" />
                 <LocationInput label="Titik Asal" placeholder="Cari asal..." value={asal} onChange={setAsal} />
@@ -263,7 +277,7 @@ export default function PetaPage() {
                 )}
               </div>
             )}
-            
+
             {osrmError && (
               <div className="mt-4 p-3 bg-red-50 text-red-600 text-xs rounded-lg">
                 Gagal mengambil rute jalan. Menampilkan garis lurus (jarak udara).
@@ -277,12 +291,11 @@ export default function PetaPage() {
               <div className="text-sm font-bold text-gray-800 mb-3 px-1">Rekomendasi Transportasi Umum</div>
               <div className="space-y-3">
                 {rekomendasi.map((rec, i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     onClick={() => handleSelectModa(rec)}
-                    className={`rounded-xl border p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer ${
-                      selectedModa === rec.moda ? 'bg-[#E1F5EE] border-[#1D9E75]' : 'bg-white border-gray-100 hover:border-[#1D9E75]'
-                    }`}
+                    className={`rounded-xl border p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer ${selectedModa === rec.moda ? 'bg-[#E1F5EE] border-[#1D9E75]' : 'bg-white border-gray-100 hover:border-[#1D9E75]'
+                      }`}
                   >
                     {i === 0 && (
                       <div className="absolute top-0 right-0 bg-[#FAC775] text-[#085041] text-[10px] font-bold px-3 py-1 rounded-bl-lg">
@@ -295,15 +308,29 @@ export default function PetaPage() {
 
                     {rec.isTooFar && (
                       <div className="text-xs text-red-500 font-medium mb-2">
-                        Stasiun terlalu jauh ({(rec.firstMileKm! + rec.lastMileKm!).toFixed(1)} km jalan kaki)
+                        Stasiun terlalu jauh ({Number(rec.firstMileKm! + rec.lastMileKm!).toFixed(1)} km — tidak realistis)
                       </div>
                     )}
-                    
+
+                    {!rec.isTooFar && rec.firstMileMode === 'ride' && (
+                      <div className="text-xs text-amber-600 font-medium mb-2">
+                        🛵 Perlu ojek/motor ke stasiun ({Number(rec.firstMileKm! + rec.lastMileKm!).toFixed(2)} km first+last mile)
+                      </div>
+                    )}
+
                     {!rec.isTooFar && rec.stasiunAwal && (
                       <div className="text-[10px] text-gray-500 mb-3 bg-white/50 p-2 rounded border border-gray-100">
-                        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"/> Jalan {rec.firstMileKm} km ke {rec.stasiunAwal}</div>
-                        <div className="flex items-center gap-1.5 border-l border-gray-300 ml-0.5 pl-1.5 my-1 py-1"><span className="text-blue-500 font-bold tracking-widest text-[8px]">|||</span> Transit {rec.transitKm} km</div>
-                        <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"/> Jalan {rec.lastMileKm} km ke tujuan</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                          {rec.firstMileMode === 'ride' ? '🛵 Ojek' : '🚶 Jalan'} {rec.firstMileKm} km ke {rec.stasiunAwal}
+                        </div>
+                        <div className="flex items-center gap-1.5 border-l border-gray-300 ml-0.5 pl-1.5 my-1 py-1">
+                          <span className="text-blue-500 font-bold tracking-widest text-[8px]">|||</span> Transit {rec.transitKm} km
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                          {rec.firstMileMode === 'ride' ? '🛵 Ojek' : '🚶 Jalan'} {rec.lastMileKm} km ke tujuan
+                        </div>
                       </div>
                     )}
 
@@ -313,8 +340,14 @@ export default function PetaPage() {
                         <div className="font-medium text-[#1D9E75]">{rec.emisi} kg CO₂</div>
                       </div>
                       <div>
-                        <div className="text-gray-400">Hemat vs Mobil</div>
-                        <div className="font-medium text-[#1D9E75]">{rec.hemat} kg CO₂</div>
+                        <div className="text-gray-400">
+                          {rec.moda.includes('Mobil') ? 'Emisi Referensi' : 'Hemat vs Mobil'}
+                        </div>
+                        <div className="font-medium text-[#1D9E75]">
+                          {rec.moda === 'Mobil Pribadi'
+                            ? `${rec.emisi} kg CO₂`
+                            : `${rec.hemat} kg CO₂`}
+                        </div>
                       </div>
                       <div>
                         <div className="text-gray-400">Waktu Est.</div>
@@ -326,12 +359,35 @@ export default function PetaPage() {
                       </div>
                     </div>
 
-                    <button 
+                    {/* <button 
                       onClick={(e) => { e.stopPropagation(); handleSimpanTrip(rec); }}
                       disabled={isSaving || rec.isTooFar}
                       className="w-full py-2 bg-gray-50 text-[#1D9E75] text-xs font-semibold rounded-lg hover:bg-[#1D9E75] hover:text-white transition-colors disabled:opacity-50 disabled:hover:bg-gray-50 disabled:hover:text-[#1D9E75]"
                     >
                       {isSaving ? 'Menyimpan...' : rec.isTooFar ? 'Rute Tidak Valid' : 'Pilih & Simpan Trip'}
+                    </button> */}
+                    <button
+                      onClick={(e) => { e.stopPropagation();
+                        // Jika user memilih kendaraan pribadi, lempar ke kalkulator
+                        if (rec.moda.includes('Pribadi')) {
+                          const jenisKendaraan = rec.moda.toLowerCase().includes('motor') ? 'motor' : 'mobil';
+                          // Kirim jarak desimal asli agar tidak kehilangan presisi
+                          router.push(`/kalkulator?jarak=${jarakKm.toFixed(1)}&jenis=${jenisKendaraan}&dari-peta=1`);
+                        } else {
+                          // Jika transportasi umum (KRL, TransJakarta, Sepeda), langsung simpan!
+                          handleSimpanTrip(rec);
+                        }
+                      }}
+                      disabled={isSaving || rec.isTooFar}
+                      className="w-full py-2 bg-gray-50 text-[#1D9E75] text-xs font-semibold rounded-lg hover:bg-[#1D9E75] hover:text-white transition-colors disabled:opacity-50 disabled:hover:bg-gray-50 disabled:hover:text-[#1D9E75]"
+                    >
+                      {isSaving
+                        ? 'Menyimpan...'
+                        : rec.isTooFar
+                          ? 'Rute Tidak Valid'
+                          : rec.moda.includes('Pribadi')
+                            ? 'Pilih Detail BBM di Kalkulator →'  // Teks berubah khusus untuk kendaraan pribadi
+                            : 'Pilih & Simpan Trip'}
                     </button>
                   </div>
                 ))}
@@ -343,9 +399,8 @@ export default function PetaPage() {
         {/* PANEL KANAN (Map) */}
         <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden relative">
           {toast && (
-            <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all ${
-              toast.type === 'success' ? 'bg-[#1D9E75] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all ${toast.type === 'success' ? 'bg-[#1D9E75] text-white' : 'bg-red-500 text-white'
+              }`}>
               {toast.msg}
             </div>
           )}
