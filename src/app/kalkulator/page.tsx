@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
@@ -12,8 +12,8 @@ const JENIS_KENDARAAN = [
   { value: 'mobil', label: 'Mobil' },
 ]
 
-const MODA_BBM_KEYS = ['transjakarta', 'krl', 'sepeda']
-const MODA_ICONS = ['🚌', '🚆', '🚲']
+const MODA_BBM_KEYS = ['sepeda', 'krl', 'transjakarta']
+const MODA_ICONS = ['🚲', '🚆', '🚌']
 
 const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
   motor: [
@@ -31,9 +31,17 @@ const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
 export default function KalkulatorPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [jenis, setJenis] = useState('motor')
+  const searchParams = useSearchParams();
+
+  // Tangkap parameter dari URL (misal: /kalkulator?jarak=15&jenis=mobil)
+  const jarakDariUrl = searchParams.get('jarak')
+  const jenisDariUrl = searchParams.get('jenis')
+
+  // Jadikan nilai dari URL sebagai nilai awal (default state)
+  const dariPeta = searchParams.get('dari-peta') === '1'
+  const [jenis, setJenis] = useState(jenisDariUrl === 'mobil' ? 'mobil' : 'motor')
+  const [jarak, setJarak] = useState(jarakDariUrl ? Number(jarakDariUrl) : 20)
   const [bbm, setBbm] = useState('pertalite')
-  const [jarak, setJarak] = useState(20)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -137,8 +145,8 @@ export default function KalkulatorPage() {
                   {JENIS_KENDARAAN.map(k => (
                     <button key={k.value} onClick={() => { setJenis(k.value); setBbm('pertalite') }}
                       className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
-                          ? 'bg-[#1D9E75] text-white'
-                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                        ? 'bg-[#1D9E75] text-white'
+                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                         }`}>
                       {k.value === 'motor' ? '🏍️' : '🚗'} {k.label}
                     </button>
@@ -153,8 +161,8 @@ export default function KalkulatorPage() {
                   {BBM_OPTIONS[jenis].map(b => (
                     <button key={b.value} onClick={() => setBbm(b.value)}
                       className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${bbm === b.value
-                          ? 'bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB]'
-                          : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
+                        ? 'bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB]'
+                        : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
                         }`}>
                       {b.label}
                     </button>
@@ -165,15 +173,43 @@ export default function KalkulatorPage() {
               {/* Jarak */}
               <div className="bg-white rounded-xl border border-gray-100 p-4">
                 <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm font-medium text-gray-700">Jarak Tempuh Harian</div>
-                  <div className="text-lg font-medium text-amber-600">{jarak} km</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-gray-700">Jarak Tempuh Harian</div>
+                    {dariPeta && (
+                      <span className="text-[10px] bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB] px-2 py-0.5 rounded-full font-medium">
+                        📍 Dari Peta
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step={0.1}
+                      value={jarak}
+                      onChange={e => !dariPeta && setJarak(Number(e.target.value))}
+                      readOnly={dariPeta}
+                      className={`w-20 text-right font-medium text-amber-600 border rounded-md px-2 py-1 focus:outline-none ${
+                        dariPeta
+                          ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500'
+                          : 'bg-gray-50 border-gray-200 focus:border-[#1D9E75]'
+                      }`}
+                    />
+                    <span className="text-sm font-medium text-gray-500">km</span>
+                  </div>
                 </div>
-                <input type="range" min={1} max={100} step={1} value={jarak}
-                  onChange={e => setJarak(Number(e.target.value))}
-                  className="w-full accent-[#1D9E75]" />
-                <div className="flex justify-between text-xs text-gray-300 mt-1">
-                  <span>1 km</span><span>100 km</span>
-                </div>
+
+                {/* Slider hanya tampil jika bukan dari peta */}
+                {!dariPeta && (
+                  <input type="range" min={0.0} max={100} step={0.1} value={jarak}
+                    onChange={e => setJarak(Number(e.target.value))}
+                    className="w-full accent-[#1D9E75]" />
+                )}
+                {dariPeta && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Jarak dikunci berdasarkan rute dari Peta. <button onClick={() => { /* allow editing */ }} className="text-[#1D9E75] underline hidden">Ubah</button>
+                  </div>
+                )}
               </div>
 
               {/* Rumus */}
@@ -254,8 +290,8 @@ export default function KalkulatorPage() {
               {/* Save button */}
               <button onClick={simpanTrip} disabled={saving}
                 className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${saved
-                    ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
-                    : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
+                  ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
+                  : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
                   }`}>
                 {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
               </button>

@@ -97,8 +97,6 @@ export default function LeaderboardPage() {
 
   async function fetchAll() {
     setLoading(true)
-    const detectedCity = await getUserCity()
-    setCurrentCity(detectedCity)
 
     // Fetch profiles + all trips in parallel
     const [
@@ -115,6 +113,11 @@ export default function LeaderboardPage() {
     if (tripsErr) {
       console.error('[leaderboard] trips error →', tripsErr.message, '| code:', tripsErr.code)
     }
+
+    // Get my profile early to use as fallback city
+    const meRaw = (profilesRaw ?? []).find(p => p.id === user!.id) ?? null
+    const detectedCity = await getUserCity(meRaw?.kota || 'Jakarta')
+    setCurrentCity(detectedCity)
 
     // Aggregate hemat + poin per user from trips (source of truth)
     const statsByUser: Record<string, { hemat: number; poin: number }> = {}

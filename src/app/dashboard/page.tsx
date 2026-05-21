@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { RATA_RATA_NASIONAL } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useRouter } from 'next/navigation'
+import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift } from 'lucide-react'
 
 type Trip = {
   id: string
@@ -20,6 +21,7 @@ type Trip = {
 }
 
 type Profile = {
+  id?: string
   username: string
   kota: string
   total_poin: number
@@ -29,12 +31,18 @@ type Profile = {
 
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
+
 function sapaanWaktu() {
   const jam = new Date().getHours()
   if (jam >= 5 && jam < 11) return 'Selamat pagi'
   if (jam >= 11 && jam < 15) return 'Selamat siang'
   if (jam >= 15 && jam < 19) return 'Selamat sore'
   return 'Selamat malam'
+}
+
+/** Format angka emisi konsisten 3 desimal agar tidak ada pembulatan yang menipu (0.088 tetap 0.088, bukan 0.09) */
+function fmtEmisi(n: number) {
+  return Number(n.toFixed(3))
 }
 
 export default function DashboardPage() {
@@ -45,9 +53,18 @@ export default function DashboardPage() {
   const [emisiHariIni, setEmisiHariIni] = useState(0)
   const [chartData, setChartData] = useState<{ hari: string; emisi: number }[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [topUsers, setTopUsers] = useState<Profile[]>([])
 
-  const [editingKota, setEditingKota] = useState(false)
-  const [newKota, setNewKota] = useState('')
+  // Kota picker state — 2-step: Provinsi → Kota/Kab via emsifa API
+  const [kotaOpen, setKotaOpen] = useState(false)
+  const [provinsiList, setProvinsiList] = useState<{ id: string; name: string }[]>([])
+  const [kotaList, setKotaList] = useState<{ id: string; name: string }[]>([])
+  const [selectedProvId, setSelectedProvId] = useState('')
+  const [selectedProvName, setSelectedProvName] = useState('')
+  const [loadingProv, setLoadingProv] = useState(false)
+  const [loadingKota, setLoadingKota] = useState(false)
+  const [savingKota, setSavingKota] = useState(false)
+  const kotaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/')
@@ -58,8 +75,44 @@ export default function DashboardPage() {
     fetchData()
   }, [user])
 
+  // Close kota dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (kotaRef.current && !kotaRef.current.contains(e.target as Node)) {
+        setKotaOpen(false)
+        setSelectedProvId('')
+        setSelectedProvName('')
+        setKotaList([])
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Load provinsi saat dropdown dibuka
+  useEffect(() => {
+    if (!kotaOpen || provinsiList.length > 0) return
+    setLoadingProv(true)
+    fetch('https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json')
+      .then(r => r.json())
+      .then(data => setProvinsiList(data))
+      .catch(() => {})
+      .finally(() => setLoadingProv(false))
+  }, [kotaOpen])
+
+  // Load kota saat provinsi dipilih
+  useEffect(() => {
+    if (!selectedProvId) return
+    setLoadingKota(true)
+    setKotaList([])
+    fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedProvId}.json`)
+      .then(r => r.json())
+      .then(data => setKotaList(data))
+      .catch(() => {})
+      .finally(() => setLoadingKota(false))
+  }, [selectedProvId])
+
   async function fetchData() {
-    // Ambil trips 7 hari terakhir
     const tujuhHariLalu = new Date()
     tujuhHariLalu.setDate(tujuhHariLalu.getDate() - 7)
 
@@ -73,14 +126,12 @@ export default function DashboardPage() {
     if (tripsData) {
       setTrips(tripsData)
 
-      // Emisi hari ini
       const hari = new Date().toDateString()
       const emisiToday = tripsData
         .filter(t => new Date(t.created_at).toDateString() === hari)
         .reduce((acc, t) => acc + t.emisi_kg, 0)
-      setEmisiHariIni(Number(emisiToday.toFixed(2)))
+      setEmisiHariIni(fmtEmisi(emisiToday))
 
-      // Data grafik per hari
       const grouped: Record<string, number> = {}
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
@@ -96,11 +147,10 @@ export default function DashboardPage() {
       })
       setChartData(Object.entries(grouped).map(([k, v]) => ({
         hari: HARI[new Date(k).getDay()],
-        emisi: Number(v.toFixed(2)),
+        emisi: fmtEmisi(v),
       })))
     }
 
-    // Ambil profile
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -108,14 +158,36 @@ export default function DashboardPage() {
       .single()
 
     if (profileData) setProfile(profileData)
+
+    // Fetch top 3 users for Leaderboard Preview
+    const { data: topData } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('total_poin', { ascending: false })
+      .limit(3)
+    
+    if (topData) {
+      setTopUsers(topData)
+    }
+
     setDataLoading(false)
+  }
+
+  async function handleSaveKota(kotaName: string) {
+    setSavingKota(true)
+    await supabase.from('profiles').update({ kota: kotaName }).eq('id', user!.id)
+    setProfile(p => p ? { ...p, kota: kotaName } : null)
+    setKotaOpen(false)
+    setSelectedProvId('')
+    setSelectedProvName('')
+    setKotaList([])
+    setSavingKota(false)
   }
 
   if (loading) return <div className="flex items-center justify-center h-screen text-gray-400">Memuat...</div>
 
-  const totalHematTrips = Number(
-    trips.reduce((a, t) => a + (t.emisi_dihemat ?? 0), 0).toFixed(2)
-  )
+  // Gunakan fmtEmisi secara konsisten agar tidak ada perbedaan antara stat cards dan smart comparison
+  const totalHematTrips = fmtEmisi(trips.reduce((a, t) => a + (t.emisi_dihemat ?? 0), 0))
 
   const emisiKemarin = trips
     .filter(t => {
@@ -133,11 +205,10 @@ export default function DashboardPage() {
 
   const todayStr = new Date().toDateString()
   const todayTrips = trips.filter(t => new Date(t.created_at).toDateString() === todayStr)
-  
   const tripHijauHariIni = todayTrips.filter(t => t.jenis === 'transportasi_umum').length
-  const totalHematHariIni = todayTrips.reduce((s, t) => s + (t.emisi_dihemat || 0), 0)
+  // totalHematHariIni pakai fmtEmisi agar konsisten dengan tampilan di stat card
+  const totalHematHariIni = fmtEmisi(todayTrips.reduce((s, t) => s + (t.emisi_dihemat || 0), 0))
 
-  // Smart Comparison State
   let smartMsg = ''
   let smartBtnText = ''
   let smartBtnLink = ''
@@ -147,17 +218,32 @@ export default function DashboardPage() {
     smartBtnText = 'Catat Perjalanan →'
     smartBtnLink = '/kalkulator'
   } else if (tripHijauHariIni > 0) {
-    const pohon = Math.floor(totalHematHariIni / 0.021)
-    smartMsg = `Keren! Kamu sudah hemat ${totalHematHariIni.toFixed(2)} kg CO₂ hari ini dengan memilih transportasi hijau. Setara menanam ${pohon} pohon! 🎉`
-    smartBtnText = 'Lihat Leaderboard →'
+    // Pohon dewasa serap ~21kg/tahun = ~0.0575kg/hari. Total hemat harian dibagi 0.0575.
+    const pohon = Math.floor(totalHematHariIni / 0.0575)
+    smartMsg = `${totalHematHariIni} kg CO₂ yang kamu hemat hari ini setara dengan kemampuan serap ${pohon} Pohon Mahoni 🌳`
+    smartBtnText = 'Lihat Leaderboard'
     smartBtnLink = '/leaderboard'
   } else {
-    // Ada trip kendaraan tapi belum ada trip hijau
-    const hematEstimasi = emisiHariIni * 0.94
-    const pohon = Math.floor(hematEstimasi / 0.021)
-    smartMsg = `Emisi kamu hari ini ${emisiHariIni} kg CO₂. Jika naik TransJakarta, kamu bisa hemat ${hematEstimasi.toFixed(2)} kg CO₂ setara oksigen ${pohon} pohon selama 1 hari! 🌳`
-    smartBtnText = 'Coba Rute Hijau →'
+    const hematEstimasi = fmtEmisi(emisiHariIni * 0.94)
+    const pohon = Math.floor(hematEstimasi / 0.0575)
+    smartMsg = `Jika kamu naik transportasi umum, ${hematEstimasi} kg CO₂ yang kamu hemat setara dengan ${pohon} Pohon Mahoni 🌳`
+    smartBtnText = 'Coba Rute Hijau'
     smartBtnLink = '/peta'
+  }
+
+  // Leveling Logic
+  const poin = profile?.total_poin ?? 0
+  let levelName = '🌱 Pemula Hijau'
+  let levelNext = 100
+  let levelNum = 1
+  if (poin >= 100 && poin < 500) {
+    levelName = '🥉 Bronze Commuter'
+    levelNext = 500
+    levelNum = 2
+  } else if (poin >= 500) {
+    levelName = '🥈 Silver Commuter'
+    levelNext = 1500
+    levelNum = 3
   }
 
   const targetHarian = 3
@@ -175,37 +261,85 @@ export default function DashboardPage() {
             <div className="text-xs text-gray-400">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
           </div>
           <div className="flex items-center gap-3">
-            {editingKota ? (
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  value={newKota}
-                  onChange={e => setNewKota(e.target.value)}
-                  className="text-xs px-2 py-1 rounded-full border border-gray-200 outline-none text-gray-700 w-28"
-                  placeholder="Nama kota..."
-                  autoFocus
-                />
-                <button onClick={async () => {
-                  if (!newKota.trim()) { setEditingKota(false); return; }
-                  await supabase.from('profiles').update({ kota: newKota.trim() }).eq('id', user!.id)
-                  setProfile(p => p ? { ...p, kota: newKota.trim() } : null)
-                  setEditingKota(false)
-                }} className="text-xs bg-[#1D9E75] text-white px-3 py-1 rounded-full hover:bg-[#0F6E56]">Simpan</button>
-                <button onClick={() => setEditingKota(false)} className="text-xs text-gray-400 hover:text-gray-600">Batal</button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => { setEditingKota(true); setNewKota(profile?.kota || ''); }}
+
+            {/* Kota Picker — dropdown dengan API wilayah Indonesia */}
+            <div className="relative" ref={kotaRef}>
+              <button
+                onClick={() => { setKotaOpen(o => !o) }}
                 className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1.5 hover:bg-gray-200 transition-colors"
                 title="Ubah kota"
               >
-                📍 {profile?.kota || 'Memuat...'} <span className="opacity-50">✎</span>
+                📍 {profile?.kota || 'Pilih Kota'} <span className="opacity-40 text-[10px]">▾</span>
               </button>
-            )}
-            <span className="bg-[#1D9E75] text-white text-xs px-3 py-1 rounded-full">
-              🔥 Streak {profile?.streak ?? 0} hari
-            </span>
-            <div className="w-8 h-8 rounded-full bg-[#1D9E75] flex items-center justify-center text-white text-xs font-medium">
+
+              {kotaOpen && (
+                <div className="absolute right-0 top-8 z-50 bg-white rounded-xl shadow-lg border border-gray-100 w-72 overflow-hidden">
+                  {/* Header */}
+                  <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+                    {selectedProvId ? (
+                      <button
+                        onClick={() => { setSelectedProvId(''); setSelectedProvName(''); setKotaList([]) }}
+                        className="text-[#1D9E75] text-xs font-medium flex items-center gap-1 hover:underline"
+                      >
+                        ← {selectedProvName}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-500 font-medium">Pilih Provinsi</span>
+                    )}
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto">
+                    {/* Step 1: Pilih Provinsi */}
+                    {!selectedProvId && (
+                      loadingProv ? (
+                        <div className="text-center text-xs text-gray-400 py-6">Memuat provinsi...</div>
+                      ) : (
+                        provinsiList.map(prov => (
+                          <button
+                            key={prov.id}
+                            onClick={() => { setSelectedProvId(prov.id); setSelectedProvName(prov.name) }}
+                            className="w-full text-left text-xs px-3 py-2.5 hover:bg-[#E1F5EE] text-gray-600 transition-colors flex items-center justify-between"
+                          >
+                            <span>{prov.name}</span>
+                            <span className="text-gray-300">›</span>
+                          </button>
+                        ))
+                      )
+                    )}
+
+                    {/* Step 2: Pilih Kota/Kab */}
+                    {selectedProvId && (
+                      loadingKota ? (
+                        <div className="text-center text-xs text-gray-400 py-6">Memuat kota/kabupaten...</div>
+                      ) : (
+                        kotaList.map(k => (
+                          <button
+                            key={k.id}
+                            onClick={() => handleSaveKota(
+                              k.name.replace(/\b\w/g, c => c.toUpperCase())
+                            )}
+                            disabled={savingKota}
+                            className={`w-full text-left text-xs px-3 py-2.5 hover:bg-[#E1F5EE] transition-colors ${
+                              profile?.kota === k.name.replace(/\b\w/g, c => c.toUpperCase())
+                                ? 'bg-[#E1F5EE] text-[#085041] font-medium'
+                                : 'text-gray-600'
+                            }`}
+                          >
+                            {k.name.replace(/\b\w/g, c => c.toUpperCase())}
+                          </button>
+                        ))
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-[#FFEDD5] text-[#EA580C] text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-[#FDBA74]/50">
+              <span className="text-sm">🔥</span> 
+              <span>{profile?.streak ?? 0}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#1D9E75] flex items-center justify-center text-white text-xs font-bold shadow-sm border border-[#1D9E75]/20">
               {(profile?.username || user?.email || 'U')[0].toUpperCase()}
             </div>
           </div>
@@ -221,6 +355,70 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (<>
+
+          {/* Gamification Top Row: Profile & Leaderboard Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Profile Leveling Card */}
+            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-12 h-12 rounded-full bg-[#E1F5EE] border-2 border-[#1D9E75]/20 flex items-center justify-center text-[#1D9E75]">
+                  <Award className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-0.5">Level {levelNum}</div>
+                  <div className="text-[15px] font-bold text-gray-800">{levelName}</div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
+                  <span>{poin.toLocaleString()} Poin</span>
+                  <span className="text-gray-400">{levelNext.toLocaleString()} Poin</span>
+                </div>
+                <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[#1D9E75] rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((poin / levelNext) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-gray-400 mt-2.5 text-center">
+                  Butuh <span className="font-bold text-gray-600">{Math.max(levelNext - poin, 0)} poin</span> lagi untuk naik level!
+                </div>
+              </div>
+            </div>
+
+            {/* Top 3 Leaderboard Preview */}
+            <div className="md:col-span-2 bg-white rounded-xl border border-gray-100 p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                  <span className="text-lg">🏆</span>
+                  Pahlawan Bumi Minggu Ini
+                </div>
+                <a href="/leaderboard" className="text-[11px] bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">
+                  Lihat Semua
+                </a>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {topUsers.length > 0 ? topUsers.map((user, i) => {
+                  const icons = ['🥇', '🥈', '🥉']
+                  const colors = ['bg-amber-100 text-amber-600', 'bg-gray-100 text-gray-600', 'bg-orange-100 text-orange-600']
+                  return (
+                    <div key={user.id} className="flex flex-col items-center justify-center p-3 rounded-lg border border-gray-50 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                      <div className="relative mb-2">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${colors[i] || 'bg-blue-100 text-blue-600'}`}>
+                          {(user.username || user.id || 'U')[0].toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-1.5 -right-1.5 text-sm drop-shadow-sm">{icons[i] || '⭐'}</div>
+                      </div>
+                      <div className="text-xs font-semibold text-gray-700 w-full text-center truncate">{user.username || 'User'}</div>
+                      <div className="text-[10px] font-medium text-[#1D9E75] mt-0.5">{user.total_poin ?? 0} pts</div>
+                    </div>
+                  )
+                }) : (
+                  <div className="col-span-3 text-center text-xs text-gray-400 py-4">Belum ada data leader</div>
+                )}
+              </div>
+            </div>
+          </div>
           {/* Stat cards */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
@@ -235,7 +433,8 @@ export default function DashboardPage() {
               },
               {
                 label: 'Total Hemat',
-                val: `${totalHematTrips.toFixed(1)} kg`,
+                // Konsisten: tampilkan 2 desimal (sama dengan smart comparison)
+                val: `${totalHematTrips} kg`,
                 sub: 'CO₂ tersimpan',
                 extra: `≈ ${Math.floor(totalHematTrips / 21)} pohon dewasa`,
                 color: 'text-[#1D9E75]',
@@ -244,7 +443,7 @@ export default function DashboardPage() {
                 label: 'Poin Gamifikasi',
                 val: (profile?.total_poin ?? 0).toLocaleString(),
                 sub: 'poin total',
-                extra: '+10 per trip',
+                extra: 'Per trip: Sepeda +80, Trans +50, KRL +40',
                 color: 'text-amber-500',
               },
               {
@@ -294,24 +493,30 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-[#E1F5EE] rounded-xl border border-[#9FE1CB] p-4 flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-medium text-[#085041] mb-3">💡 Smart Comparison</div>
-                <p className="text-sm text-[#0F6E56] leading-relaxed mb-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
+              {/* Dekorasi Background */}
+              <div className="absolute right-0 top-0 w-32 h-32 bg-[#E1F5EE] rounded-bl-[100px] -z-0 opacity-50" />
+              <TreePine className="absolute right-4 top-4 w-12 h-12 text-[#1D9E75]/20 z-0" />
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#1D9E75] mb-3">
+                  <TreePine className="w-4 h-4" /> Smart Comparison
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed mb-6 pr-8">
                   {smartMsg}
                 </p>
                 
-                {/* Progress bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-[10px] text-[#085041] mb-1 font-medium">
-                    <span>Target harian: {targetHarian} kg CO₂</span>
+                {/* Progress bar Target */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mb-4">
+                  <div className="flex justify-between text-[10px] text-gray-500 mb-1.5 font-medium">
+                    <span>Target Harian: {targetHarian} kg CO₂</span>
                     {emisiHariIni === 0 ? (
-                      <span className="text-[#1D9E75]">Hari ini nol emisi! 🌿</span>
+                      <span className="text-[#1D9E75]">Nol emisi! 🌿</span>
                     ) : (
-                      <span className={isOverLimit ? 'text-red-500' : ''}>{emisiHariIni} kg</span>
+                      <span className={isOverLimit ? 'text-red-500' : 'text-gray-700'}>{emisiHariIni} kg</span>
                     )}
                   </div>
-                  <div className="h-1.5 w-full bg-[#c5eadb] rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${emisiHariIni === 0 ? 'bg-[#1D9E75]' : isOverLimit ? 'bg-red-500' : 'bg-[#1D9E75]'}`}
                       style={{ width: `${emisiHariIni === 0 ? 100 : progressPercent}%` }}
@@ -321,8 +526,8 @@ export default function DashboardPage() {
               </div>
 
               <a href={smartBtnLink}
-                className="inline-flex items-center gap-2 bg-[#1D9E75] text-white text-xs px-4 py-2 rounded-lg hover:bg-[#0F6E56] transition-colors w-fit">
-                {smartBtnText}
+                className="relative z-10 inline-flex items-center justify-center gap-1.5 bg-[#1D9E75] text-white text-xs font-medium px-4 py-2.5 rounded-lg hover:bg-[#0F6E56] transition-colors w-full sm:w-fit">
+                {smartBtnText} <ChevronRight className="w-3 h-3" />
               </a>
             </div>
           </div>
@@ -339,15 +544,16 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-lg">
                         {t.jenis === 'motor' ? '🏍️' : t.jenis === 'transportasi_umum'
-                          ? (t.bbm === 'sepeda' ? '🚲' : t.bbm === 'krl' ? '🚆' : '🚌')
+                          ? (t.bbm === 'sepeda' ? '🚲' : t.bbm === 'krl' ? '🚆' : t.bbm === 'transjakarta' ? '🚌' : '🚃')
                           : '🚗'}
                       </span>
                       <div>
-                        <div className="text-sm text-gray-700 capitalize">{t.jenis} — {t.bbm}</div>
+                        <div className="text-sm text-gray-700 capitalize">{t.jenis.replace('_', ' ')} — {t.bbm}</div>
                         <div className="text-xs text-gray-400">{t.jarak_km} km · {new Date(t.created_at).toLocaleDateString('id-ID')}</div>
                       </div>
                     </div>
-                    <div className="text-sm font-medium text-amber-600">{t.emisi_kg} kg CO₂</div>
+                    {/* Tampilkan emisi dengan 3 desimal agar konsisten dengan data tersimpan */}
+                    <div className="text-sm font-medium text-amber-600">{Number(t.emisi_kg).toFixed(3)} kg CO₂</div>
                   </div>
                 ))}
               </div>
