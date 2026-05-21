@@ -303,28 +303,31 @@ export default function DashboardPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col">
         {/* Topbar */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
-          <div>
-            <div className="font-medium text-gray-800">Dashboard</div>
-            <div className="text-xs text-gray-400">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 bg-white border-b border-gray-100 gap-2 min-w-0">
+          <div className="min-w-0">
+            <div className="font-medium text-gray-800 text-sm md:text-base truncate">Dashboard</div>
+            <div className="text-xs text-gray-400 truncate">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Tombol Bagikan */}
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+            {/* Tombol Bagikan — ikon only on mobile */}
             <button
               onClick={() => setShowShareModal(true)}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1D9E75] bg-[#E1F5EE] rounded-full hover:bg-[#c2ebd9] transition-colors"
+              className="flex items-center gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-[#1D9E75] bg-[#E1F5EE] rounded-full hover:bg-[#c2ebd9] transition-colors"
             >
-              <Share className="w-3.5 h-3.5" /> Bagikan
+              <Share className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Bagikan</span>
             </button>
 
-            {/* Kota Picker — dropdown dengan API wilayah Indonesia */}
+            {/* Kota Picker */}
             <div className="relative" ref={kotaRef}>
               <button
                 onClick={() => { setKotaOpen(o => !o) }}
-                className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1.5 hover:bg-gray-200 transition-colors"
+                className="text-xs text-gray-500 bg-gray-100 px-2 md:px-3 py-1 rounded-full flex items-center gap-1 hover:bg-gray-200 transition-colors"
                 title="Ubah kota"
               >
-                <MapPin size={14} className="text-gray-400" /> {profile?.kota || 'Pilih Kota'} <span className="opacity-40 text-[10px]">▾</span>
+                <MapPin size={14} className="text-gray-400 shrink-0" />
+                <span className="hidden sm:inline truncate max-w-[80px]">{profile?.kota || 'Kota'}</span>
+                <span className="opacity-40 text-[10px]">▾</span>
               </button>
 
               {kotaOpen && (
@@ -388,11 +391,13 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 bg-[#FFEDD5] text-[#EA580C] text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-[#FDBA74]/50">
+            <div className="hidden md:flex items-center gap-1.5 bg-[#FFEDD5] text-[#EA580C] text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-[#FDBA74]/50">
               <Flame size={14} className="text-[#EA580C]" strokeWidth={2.5} /> 
               <span>{profile?.streak ?? 0}</span>
             </div>
-            <LevelBadge poin={profile?.total_poin ?? 0} size="sm" />
+            <div className="hidden md:block">
+              <LevelBadge poin={profile?.total_poin ?? 0} size="sm" />
+            </div>
             <div className="w-8 h-8 rounded-full bg-[#1D9E75] flex items-center justify-center text-white text-xs font-bold shadow-sm border border-[#1D9E75]/20">
               {(profile?.username || user?.email || 'U')[0].toUpperCase()}
             </div>

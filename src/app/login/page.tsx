@@ -32,44 +32,49 @@ export default function HomePage() {
           Z
       */}
          <svg
-            className="absolute inset-0 w-full h-full z-0 pointer-events-none"
+            className="hidden md:block absolute inset-0 w-full h-full z-0 pointer-events-none"
             viewBox="0 0 950 900"
             preserveAspectRatio="none"
             xmlns="http://www.w3.org/2000/svg"
          >
             <path
-               d="M 1600 0 L 1600 900 L 500 900 C 780 300, 350 350, 380 0 Z"
+               d="M 950 0 L 950 900 L 520 900 C 620 500, 370 400, 470 0 Z"
                fill="#15594B"
             />
          </svg>
 
+         {/* Mobile background (stacked) */}
+         <div className="md:hidden absolute inset-0 w-full h-full z-0 flex flex-col bg-[#15594B]">
+           <div className="h-[40%] bg-white rounded-b-[40px] sm:rounded-b-[60px] shadow-sm z-10 w-full"></div>
+         </div>
+
          {/* ── Layer konten (di atas SVG) ── */}
-         <div className="relative z-10 min-h-screen flex">
-            {/* Kiri — area putih, logo di tengah */}
-            <div className="flex-1 flex flex-col items-start justify-center pt-10 pl-95">
+         <div className="relative z-10 min-h-screen flex flex-col md:flex-row">
+            {/* Kiri/Atas — area putih, logo di tengah */}
+            <div className="h-[40vh] md:h-auto md:flex-1 flex flex-col items-center md:items-start justify-center pt-8 md:pt-10 px-6 md:pl-16 lg:pl-24 xl:pl-32">
                <Image
                   src="/EmiTrackLogo2.png"
                   alt="Logo EmiTrack"
                   width={450}
                   height={160}
-                  className="object-contain"
+                  className="object-contain w-64 sm:w-72 md:w-80 lg:w-[400px] xl:w-[450px]"
                />
             </div>
 
-            {/* Kanan — area hijau, konten login */}
-            <div className="w-[30%] flex flex-col justify-center pl-[5px] pr-[170px]">
-               <h2 className="text-5xl font-semibold text-white mb-1 text-center">
+            {/* Kanan/Bawah — area hijau, konten login */}
+            <div className="flex-1 md:w-[45%] lg:w-[40%] xl:w-[35%] flex flex-col justify-center px-8 sm:px-12 md:pl-12 lg:pl-16 xl:pl-24 md:pr-16 lg:pr-24 xl:pr-32 py-10 md:py-0">
+               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-white mb-2 md:mb-1 text-center">
                   Masuk ke EmiTrack
                </h2>
-               <p className="text-lg text-gray-300 mb-8 text-center">
+               <p className="text-sm sm:text-base lg:text-lg text-gray-300 mb-8 text-center">
                   Mulai lacak jejak karbon kamu hari ini
                </p>
 
                <button
                   onClick={signInWithGoogle}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-300/90 hover:shadow-lg active:scale-95 transition-all duration-300"
+                  className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:shadow-lg active:scale-95 transition-all duration-300"
                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                      <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -90,15 +95,15 @@ export default function HomePage() {
                   Masuk dengan Google
                </button>
 
-               <p className="text-center text-sm text-[#E2E8F0] mt-6">
+               <p className="text-center text-xs sm:text-sm text-[#E2E8F0] mt-6 px-4">
                   Dengan masuk, kamu menyetujui penggunaan data untuk tujuan
                   lingkungan
                </p>
 
-               <div className="mt-12 flex justify-center">
+               <div className="mt-10 flex justify-center">
                   <button
                      onClick={() => router.push('/')}
-                     className="group flex items-center gap-2 text-sm font-medium text-[#9FE1CB] hover:text-white transition-colors cursor-pointer"
+                     className="group flex items-center gap-2 text-xs sm:text-sm font-medium text-[#9FE1CB] hover:text-white transition-colors cursor-pointer"
                   >
                      <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
