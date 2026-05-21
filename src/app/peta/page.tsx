@@ -8,6 +8,7 @@ import LocationInput, { NominatimResult } from '@/components/LocationInput'
 import { hitungEmisi, rekomendasiRute, Rekomendasi } from '@/lib/emisi'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { Spinner } from '@/components/Skeleton'
 
 // MapClient must be dynamically imported with ssr: false to avoid window is not defined
 const MapClient = dynamic(() => import('./MapClient'), {
@@ -27,6 +28,7 @@ export default function PetaPage() {
   const [durasiMenit, setDurasiMenit] = useState(0)
   const [osrmError, setOsrmError] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isFetchingRoute, setIsFetchingRoute] = useState(false)
   const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null)
 
   const [selectedModa, setSelectedModa] = useState<string | null>(null)
@@ -54,6 +56,7 @@ export default function PetaPage() {
   }, [asal, tujuan])
 
   async function fetchOSRM(start: NominatimResult, end: NominatimResult) {
+    setIsFetchingRoute(true)
     try {
       setOsrmError(false)
       // OSRM format: lon,lat
@@ -86,6 +89,8 @@ export default function PetaPage() {
       console.error('OSRM fail', err)
       setOsrmError(true)
       setRuteOSRM(null)
+    } finally {
+      setIsFetchingRoute(false)
     }
   }
 
@@ -117,6 +122,7 @@ export default function PetaPage() {
 
     setSelectedModa(rec.moda)
     if (rec.awalLon && rec.awalLat && rec.akhirLon && rec.akhirLat && asalLatLng && tujuanLatLng) {
+      setIsFetchingRoute(true)
       try {
         const [resTransit, resFirst, resLast] = await Promise.all([
           fetch(`https://router.project-osrm.org/route/v1/driving/${rec.awalLon},${rec.awalLat};${rec.akhirLon},${rec.akhirLat}?overview=full&geometries=geojson`),
@@ -140,6 +146,8 @@ export default function PetaPage() {
         setTransitRuteOSRM(null)
         setFirstMileOSRM(null)
         setLastMileOSRM(null)
+      } finally {
+        setIsFetchingRoute(false)
       }
     }
   }
@@ -220,7 +228,10 @@ export default function PetaPage() {
         {/* PANEL KIRI (Form & Rekomendasi) */}
         <div className="w-[360px] flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <h1 className="text-lg font-bold text-gray-800 mb-1">Rencanakan Rute</h1>
+            <div className="flex justify-between items-start mb-1">
+              <h1 className="text-lg font-bold text-gray-800">Rencanakan Rute</h1>
+              {isFetchingRoute && <Spinner className="w-5 h-5 text-[#1D9E75]" />}
+            </div>
             <p className="text-xs text-gray-500 mb-5">Cari rute dan lihat potensi penghematan CO₂.</p>
             
             <div className="space-y-4 relative">

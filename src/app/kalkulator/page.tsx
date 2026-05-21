@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
+import { Spinner } from '@/components/Skeleton'
 
 const JENIS_KENDARAAN = [
   { value: 'motor', label: 'Motor' },
@@ -35,8 +36,8 @@ export default function KalkulatorPage() {
   const [bbm, setBbm] = useState('pertalite')
   const [jarak, setJarak] = useState(20)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [toast, setToast] = useState<{msg: string, type: 'success'|'info'|'warning'} | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
@@ -48,26 +49,69 @@ export default function KalkulatorPage() {
   const vsRataRata = Number(((emisiHarian / RATA_RATA_NASIONAL) * 100).toFixed(0))
   const rekomendasi = rekomendasiRute(emisiHarian, jarak)
 
-  async function upsertProfile(tambahPoin: number, tambahHemat: number) {
+  async function updateStreak(tambahPoin: number, tambahHemat: number) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('total_poin, total_hemat')
+      .select('total_poin, total_hemat, streak, updated_at')
       .eq('id', user!.id)
       .single()
+
+    if (!profile) return
+
+    const now = new Date()
+    // Konversi ke UTC+7
+    const nowUtc7 = new Date(now.getTime() + (7 * 60 * 60 * 1000))
+    const todayStr = nowUtc7.toISOString().split('T')[0]
+
+    let lastUpdateStr = ''
+    if (profile.updated_at) {
+      const last = new Date(profile.updated_at)
+      const lastUtc7 = new Date(last.getTime() + (7 * 60 * 60 * 1000))
+      lastUpdateStr = lastUtc7.toISOString().split('T')[0]
+    }
+
+    let currentStreak = profile.streak || 0
+    let toastMsg = ''
+
+    if (lastUpdateStr === todayStr && currentStreak > 0) {
+      // Sudah input hari ini
+      toastMsg = `✓ Tersimpan! +${tambahPoin} poin`
+    } else {
+      if (lastUpdateStr && currentStreak > 0) {
+        const d1 = new Date(todayStr).getTime()
+        const d2 = new Date(lastUpdateStr).getTime()
+        const diffDays = Math.floor((d1 - d2) / (1000 * 60 * 60 * 24))
+
+        if (diffDays === 1) {
+          currentStreak += 1
+          toastMsg = `🔥 Streak ${currentStreak} hari! Pertahankan!`
+        } else if (diffDays > 1) {
+          currentStreak = 1
+          toastMsg = `Streak direset. Mulai lagi dari 1! 💪`
+        }
+      } else {
+        currentStreak = 1
+        toastMsg = `🔥 Streak 1 hari! Pertahankan!`
+      }
+    }
+
     await supabase
       .from('profiles')
       .update({
-        total_poin: (profile?.total_poin ?? 0) + tambahPoin,
-        total_hemat: (profile?.total_hemat ?? 0) + tambahHemat,
-        updated_at: new Date().toISOString(),
+        total_poin: (profile.total_poin ?? 0) + tambahPoin,
+        total_hemat: Number(((profile.total_hemat ?? 0) + tambahHemat).toFixed(3)),
+        streak: currentStreak,
+        updated_at: now.toISOString(), // Simpan waktu UTC asli
       })
       .eq('id', user!.id)
+
+    setToast({ msg: toastMsg, type: 'success' })
+    setTimeout(() => setToast(null), 3500)
   }
 
   async function simpanTrip() {
     if (!user) return
     setSaving(true)
-    setSaved(false)
     setSaveError('')
 
     // Hitung penghematan vs rata-rata nasional (floored ke 0)
@@ -85,16 +129,13 @@ export default function KalkulatorPage() {
 
     if (error) { setSaveError(error.message); setSaving(false); return }
 
-    await upsertProfile(10, emisiDihemat)
+    await updateStreak(10, emisiDihemat)
     setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
   }
 
   async function simpanModaAlternatif(bbmKey: string, emisiModa: number, hemat: number, poin: number) {
     if (!user) return
     setSaving(true)
-    setSaved(false)
     setSaveError('')
 
     const emisiDihemat = Number(hemat.toFixed(3))
@@ -111,10 +152,8 @@ export default function KalkulatorPage() {
 
     if (error) { setSaveError(error.message); setSaving(false); return }
 
-    await upsertProfile(poin, emisiDihemat)
+    await updateStreak(poin, emisiDihemat)
     setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
   }
 
   return (
@@ -126,7 +165,13 @@ export default function KalkulatorPage() {
           <div className="text-xs text-gray-400">Berbasis data IPCC 2021 + ESDM RI</div>
         </div>
 
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 relative">
+          {toast && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-[#1D9E75] text-white rounded-full shadow-lg text-sm font-medium transition-all">
+              {toast.msg}
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-6">
             {/* Form kiri */}
             <div className="space-y-4">
@@ -253,11 +298,9 @@ export default function KalkulatorPage() {
 
               {/* Save button */}
               <button onClick={simpanTrip} disabled={saving}
-                className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${saved
-                    ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
-                    : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
-                  }`}>
-                {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
+                className="w-full py-3 rounded-xl text-sm font-medium transition-colors bg-[#1D9E75] text-white hover:bg-[#0F6E56] disabled:opacity-50 flex items-center justify-center gap-2">
+                {saving && <Spinner />}
+                {saving ? 'Menyimpan...' : 'Simpan Perjalanan (+10 poin)'}
               </button>
             </div>
           </div>

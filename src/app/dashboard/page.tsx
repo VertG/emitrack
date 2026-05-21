@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { RATA_RATA_NASIONAL } from '@/lib/emisi'
+import { hitungEmisi, RATA_RATA_NASIONAL } from '@/lib/emisi'
+import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/Skeleton'
 import Sidebar from '@/components/Sidebar'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useRouter } from 'next/navigation'
@@ -214,10 +215,25 @@ export default function DashboardPage() {
         {/* Content */}
         <div className="flex-1 p-6">
           {dataLoading ? (
-            <div className="flex items-center justify-center h-64 text-gray-300">
-              <div className="text-center">
-                <div className="text-3xl mb-2">🌱</div>
-                <div className="text-sm">Memuat data...</div>
+            <div className="animate-fade-in">
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-white rounded-xl border border-gray-100 p-4 h-[200px] flex flex-col">
+                   <SkeletonText width="w-1/3" className="mb-4" />
+                   <div className="flex-1 bg-gray-50 rounded animate-pulse"></div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-100 p-4 h-[200px] flex flex-col">
+                   <SkeletonText width="w-1/3" className="mb-4" />
+                   <div className="flex-1 bg-gray-50 rounded animate-pulse"></div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                 <SkeletonText width="w-1/4" className="mb-4" />
+                 <div className="space-y-2">
+                   {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
+                 </div>
               </div>
             </div>
           ) : (<>
