@@ -31,9 +31,9 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Desktop sidebar (hidden on mobile) ── */}
-      <div className="hidden md:flex w-52 h-screen sticky top-0 bg-gray-50 border-r border-gray-100 flex-col shrink-0">
+      <div className="hidden md:flex w-46 h-screen sticky top-0 bg-gray-50 border-r border-gray-100 flex-col shrink-0">
         {/* Logo */}
-        <div className="px-4 py-5 border-b border-gray-100 shrink-0">
+        <div className="pl-12 pr-4 px-4 py-5 border-b border-gray-100 shrink-0">
           <Image 
             src="/EmiTrackLogo1.png" 
             alt="EmiTrack" 
