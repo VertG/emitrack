@@ -5,40 +5,28 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Fix default marker icon for React-Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
+// Google Maps-style teardrop pin using divIcon + inline SVG
+function googlePin(color: string, size = 32): L.DivIcon {
+  const h = Math.round(size * 1.45)
+  return L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${h}" viewBox="0 0 32 46">
+      <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 30 16 30S32 28 32 16C32 7.163 24.837 0 16 0z"
+            fill="${color}" stroke="rgba(0,0,0,0.18)" stroke-width="1"/>
+      <circle cx="16" cy="16" r="6.5" fill="white" opacity="0.95"/>
+    </svg>`,
+    className: '',
+    iconSize: [size, h],
+    iconAnchor: [size / 2, h],
+    popupAnchor: [0, -h],
+  })
+}
 
-const greenIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-})
-
-const redIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-})
-
-const stationIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [20, 32],
-  iconAnchor: [10, 32],
-  popupAnchor: [1, -28],
-  shadowSize: [32, 32]
-})
+// Red destination pin (Google Maps style)
+const redPin = googlePin('#EA4335')
+// Green origin pin
+const greenPin = googlePin('#1D9E75')
+// Small blue station pin
+const stationPin = googlePin('#4285F4', 22)
 
 export type MapClientProps = {
   asal: [number, number] | null
@@ -53,13 +41,14 @@ export type MapClientProps = {
     ruteFirstMileOSRM?: [number, number][] | null
     ruteLastMileOSRM?: [number, number][] | null
   } | null
+  visible?: boolean
 }
 
 // Component helper to fit bounds when route changes
 function FitBounds({ rute }: { rute: [number, number][] }) {
   const map = useMap()
   useEffect(() => {
-    if (rute.length > 0) {
+    if (rute.length > 0 && map && (map as any)._loaded !== undefined) {
       map.fitBounds(rute, { padding: [50, 50] })
     }
   }, [map, rute])
@@ -70,14 +59,34 @@ function FitBounds({ rute }: { rute: [number, number][] }) {
 function MapController({ asal }: { asal: [number, number] | null }) {
   const map = useMap()
   useEffect(() => {
-    if (asal) {
+    if (asal && map && (map as any)._loaded !== undefined) {
       map.setView(asal, map.getZoom())
     }
   }, [map, asal])
   return null
 }
 
-export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit }: MapClientProps) {
+// Force Leaflet to recalculate tile layout when container becomes visible (mobile tab switch)
+function InvalidateOnVisible({ visible }: { visible: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+    if (visible && map) {
+      timeoutId = setTimeout(() => {
+        // Only invalidate if map instance is still valid
+        if (map && (map as any)._loaded !== undefined) {
+          map.invalidateSize()
+        }
+      }, 50)
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [map, visible])
+  return null
+}
+
+export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit, visible = true }: MapClientProps) {
   // Center TIDAK boleh berubah di MapContainer — update dilakukan via MapController
   const DEFAULT_CENTER: [number, number] = [-6.2088, 106.8456]
 
@@ -95,16 +104,18 @@ export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit }: Map
       
       {/* Update view saat asal berubah tanpa remount MapContainer */}
       <MapController asal={asal} />
+      {/* Force redraw on mobile tab switch */}
+      <InvalidateOnVisible visible={visible} />
       
-      {asal && <Marker position={asal} icon={greenIcon} />}
-      {tujuan && <Marker position={tujuan} icon={redIcon} />}
+      {asal && <Marker position={asal} icon={greenPin} />}
+      {tujuan && <Marker position={tujuan} icon={redPin} />}
 
       {/* Jika ada mode transit aktif */}
       {activeTransit && asal && tujuan && (
         <>
           {/* Stasiun Markers */}
-          <Marker position={[activeTransit.awalLat, activeTransit.awalLon]} icon={stationIcon} />
-          <Marker position={[activeTransit.akhirLat, activeTransit.akhirLon]} icon={stationIcon} />
+          <Marker position={[activeTransit.awalLat, activeTransit.awalLon]} icon={stationPin} />
+          <Marker position={[activeTransit.akhirLat, activeTransit.akhirLon]} icon={stationPin} />
 
           {/* First Mile */}
           <Polyline 

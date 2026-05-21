@@ -32,6 +32,7 @@ export default function PetaPage() {
   const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null)
 
   const [selectedModa, setSelectedModa] = useState<string | null>(null)
+  const [petaTab, setPetaTab] = useState<'cari' | 'peta'>('cari')
   const [transitRuteOSRM, setTransitRuteOSRM] = useState<[number, number][] | null>(null)
   const [firstMileOSRM, setFirstMileOSRM] = useState<[number, number][] | null>(null)
   const [lastMileOSRM, setLastMileOSRM] = useState<[number, number][] | null>(null)
@@ -238,9 +239,22 @@ export default function PetaPage() {
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
 
-      <div className="flex-1 flex p-6 gap-6 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row md:p-6 md:gap-6 h-screen overflow-hidden">
+        {/* ── Mobile tab switcher ── */}
+        <div className="md:hidden flex border-b border-gray-100 bg-white shrink-0">
+          {(['cari', 'peta'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setPetaTab(tab)}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${petaTab === tab ? 'text-[#1D9E75] border-b-2 border-[#1D9E75]' : 'text-gray-400'}`}
+            >
+              {tab === 'cari' ? '🔍 Cari Rute' : '🗺️ Peta'}
+            </button>
+          ))}
+        </div>
+
         {/* PANEL KIRI (Form & Rekomendasi) */}
-        <div className="w-[360px] flex flex-col gap-6 overflow-y-auto pr-2 pb-6 custom-scrollbar">
+        <div className={`${petaTab === 'peta' ? 'hidden' : 'flex'} md:flex w-full md:w-[360px] flex-col gap-6 overflow-y-auto pb-20 md:pb-6 px-4 pt-4 md:px-0 md:pt-0 md:pr-2 custom-scrollbar`}>
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
             <div className="flex justify-between items-start mb-1">
               <h1 className="text-lg font-bold text-gray-800">Rencanakan Rute</h1>
@@ -397,14 +411,14 @@ export default function PetaPage() {
         </div>
 
         {/* PANEL KANAN (Map) */}
-        <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden relative">
+        <div className={`${petaTab === 'cari' ? 'hidden' : 'flex'} md:flex flex-1 bg-white md:rounded-2xl border border-gray-100 overflow-hidden relative h-[calc(100dvh-9rem)] md:h-auto`}>
           {toast && (
             <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all ${toast.type === 'success' ? 'bg-[#1D9E75] text-white' : 'bg-red-500 text-white'
               }`}>
               {toast.msg}
             </div>
           )}
-          <MapClient asal={asalLatLng} tujuan={tujuanLatLng} ruteOSRM={ruteOSRM} activeTransit={activeTransit} />
+          <MapClient asal={asalLatLng} tujuan={tujuanLatLng} ruteOSRM={ruteOSRM} activeTransit={activeTransit} visible={petaTab === 'peta'} />
         </div>
       </div>
     </div>

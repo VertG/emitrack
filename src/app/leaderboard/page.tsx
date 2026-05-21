@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { toBlob } from 'html-to-image'
+import { X, Award } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -80,6 +82,11 @@ export default function LeaderboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [challengeCount, setChallengeCount] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  // Share Modal State
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
@@ -196,18 +203,57 @@ export default function LeaderboardPage() {
 
   const meInCurrentRanking = ranking.findIndex(p => p.id === user?.id)
 
+  async function handleShareImage(textToShare: string) {
+    if (!cardRef.current) return
+    setIsGeneratingImage(true)
+    try {
+      const blob = await toBlob(cardRef.current, { cacheBust: true, style: { borderRadius: '0px' } })
+      if (!blob) throw new Error("Gagal membuat gambar")
+      
+      const file = new File([blob], "emitrack-leaderboard.png", { type: "image/png" })
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "EmiTrack Leaderboard",
+          text: textToShare
+        })
+      } else {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ])
+          alert("✓ Gambar disalin ke clipboard!\n\nSilakan buka WhatsApp Web dan tekan Ctrl+V (Paste) di kolom chat.")
+        } catch (clipErr) {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'emitrack-leaderboard.png'
+          a.click()
+          URL.revokeObjectURL(url)
+          alert("✓ Gambar berhasil diunduh!\n\nSilakan kirim file tersebut di chat WhatsApp.")
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Maaf, gagal memproses gambar.")
+    } finally {
+      setIsGeneratingImage(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         {/* ── Topbar ── */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-4 md:px-6 py-3 md:py-4 bg-white border-b border-gray-100">
           <div>
             <div className="font-medium text-gray-800">Leaderboard</div>
             <div className="text-xs text-gray-400">Siapa yang paling hijau?</div>
           </div>
           {/* Tab pills */}
-          <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+          <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5 overflow-x-auto">
             {(['semua', 'kota', 'sekitar'] as Tab[]).map(t => (
               <button
                 key={t}
@@ -225,8 +271,8 @@ export default function LeaderboardPage() {
         </div>
 
         {/* ── Content ── */}
-        <div className="flex-1 p-6">
-          <div className="grid grid-cols-2 gap-5">
+        <div className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* ══════════ LEFT COLUMN ══════════ */}
               <div className="flex flex-col gap-4">
                 {/* Podium */}
@@ -390,7 +436,28 @@ export default function LeaderboardPage() {
               </div>
 
               {/* ══════════ RIGHT COLUMN — Ranking list ══════════ */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex flex-col gap-4">
+                {/* Share Banner for Top 10 */}
+                {!loading && meInCurrentRanking >= 0 && meInCurrentRanking < 10 && userProfile && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+                    <div>
+                      <div className="text-sm font-bold text-amber-900 mb-0.5">
+                        🎉 Kamu masuk Top {meInCurrentRanking + 1}! Bagikan pencapaianmu!
+                      </div>
+                      <div className="text-xs text-amber-700">
+                        Inspirasi lebih banyak orang untuk ikut kurangi emisi.
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="whitespace-nowrap px-4 py-2 bg-[#25D366] text-white text-xs font-bold rounded-lg hover:bg-[#1DA851] transition-colors shadow-sm text-center"
+                    >
+                      📤 Bagikan Sekarang
+                    </button>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">
                   {tab === 'semua' ? 'Semua Peserta' : tab === 'kota' ? `Peserta di ${userProfile?.kota ?? 'Kota Kamu'}` : `Peserta di Sekitarmu (${currentCity ?? '...'})`}
                 </div>
@@ -523,9 +590,79 @@ export default function LeaderboardPage() {
                   </div>
                 )}
               </div>
+              </div>
             </div>
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute -top-3 -right-3 z-10 bg-white text-gray-500 hover:text-gray-800 shadow-md p-1.5 rounded-full transition-colors border border-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Preview Card (This gets screenshotted) */}
+            <div ref={cardRef} className="bg-gradient-to-br from-[#085041] to-[#1D9E75] p-8 text-center text-white rounded-t-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-xl"></div>
+              
+              <div className="text-lg font-bold tracking-tight mb-4 flex items-center justify-center gap-1.5 opacity-90">
+                <span className="text-[#FAC775]">🌿</span> EmiTrack
+              </div>
+              
+              <div className="w-20 h-20 rounded-full bg-white/10 mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner border border-white/10">
+                {meInCurrentRanking === 0 ? '🥇' : meInCurrentRanking === 1 ? '🥈' : meInCurrentRanking === 2 ? '🥉' : '🏆'}
+              </div>
+              
+              <div className="text-sm font-medium text-amber-200 uppercase tracking-widest mb-1">
+                Leaderboard {tab === 'semua' ? 'Global' : tab === 'kota' ? 'Kota' : 'Sekitar'}
+              </div>
+              
+              <h3 className="text-3xl font-black leading-tight mb-3">
+                Top {meInCurrentRanking + 1}
+              </h3>
+              
+              <p className="text-xs font-medium text-white/80 mb-6 px-4">
+                dari {stats?.totalUser ?? 0} peserta. Luar biasa!
+              </p>
+              
+              <div className="inline-flex items-center gap-2 bg-black/20 rounded-full px-5 py-2 text-sm font-semibold backdrop-blur-sm border border-white/10 shadow-sm text-[#FAC775]">
+                Hemat {(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO₂
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="p-5 flex flex-col gap-3 rounded-b-2xl bg-white">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleShareImage(
+                    `\u{1F3C6} Wah! Aku berhasil tembus Top ${meInCurrentRanking + 1} di EmiTrack! Total emisi yang kuhemat: ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082! \u{1F60E}\n\nYuk, mulai langkah kecilmu untuk bumi yang lebih baik: https://emitrack.vercel.app`
+                  )}
+                  disabled={isGeneratingImage}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1D9E75] text-white font-bold rounded-xl hover:bg-[#0F6E56] transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-sm"
+                >
+                  {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
+                </button>
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `\u{1F3C6} Wah! Aku berhasil tembus Top ${meInCurrentRanking + 1} di EmiTrack! Total emisi yang kuhemat: ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082! \u{1F60E}\n\nYuk, mulai langkah kecilmu untuk bumi yang lebih baik: https://emitrack.vercel.app`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#1DA851] transition-all shadow-sm active:scale-[0.98] text-sm"
+                >
+                  💬 Share Teks
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

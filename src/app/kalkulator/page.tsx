@@ -46,7 +46,7 @@ function KalkulatorContent() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [toast, setToast] = useState<{msg: string, type: 'success'|'info'|'warning'} | null>(null)
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'info' | 'warning' } | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/')
@@ -178,14 +178,14 @@ function KalkulatorContent() {
           <div className="text-xs text-gray-400">Berbasis data IPCC 2021 + ESDM RI</div>
         </div>
 
-        <div className="flex-1 p-6 relative">
+        <div className="flex-1 p-4 md:p-6 pb-20 md:pb-6 relative">
           {toast && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-[#1D9E75] text-white rounded-full shadow-lg text-sm font-medium transition-all">
               {toast.msg}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Form kiri */}
             <div className="space-y-4">
               {/* Jenis kendaraan */}
@@ -240,8 +240,8 @@ function KalkulatorContent() {
                       onChange={e => !dariPeta && setJarak(Number(e.target.value))}
                       readOnly={dariPeta}
                       className={`w-20 text-right font-medium text-amber-600 border rounded-md px-2 py-1 focus:outline-none ${dariPeta
-                          ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500'
-                          : 'bg-gray-50 border-gray-200 focus:border-[#1D9E75]'
+                        ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500'
+                        : 'bg-gray-50 border-gray-200 focus:border-[#1D9E75]'
                         }`}
                     />
                     <span className="text-sm font-medium text-gray-500">km</span>
@@ -339,8 +339,8 @@ function KalkulatorContent() {
               {/* Save button */}
               <button onClick={simpanTrip} disabled={saving || saved}
                 className={`w-full py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${saved
-                    ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
-                    : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
+                  ? 'bg-green-50 text-[#1D9E75] border border-[#9FE1CB]'
+                  : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
                   }`}>
                 {saving && <Spinner />}
                 {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}

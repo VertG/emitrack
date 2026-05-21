@@ -7,8 +7,9 @@ import { hitungEmisi, RATA_RATA_NASIONAL } from '@/lib/emisi'
 import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/Skeleton'
 import Sidebar from '@/components/Sidebar'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { toBlob } from 'html-to-image'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift } from 'lucide-react'
+import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift, Share, X } from 'lucide-react'
 
 type Trip = {
   id: string
@@ -66,6 +67,12 @@ export default function DashboardPage() {
   const [loadingKota, setLoadingKota] = useState(false)
   const [savingKota, setSavingKota] = useState(false)
   const kotaRef = useRef<HTMLDivElement>(null)
+
+  // Share Modal State
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/')
@@ -185,6 +192,49 @@ export default function DashboardPage() {
     setSavingKota(false)
   }
 
+  async function handleShareImage(textToShare: string) {
+    if (!cardRef.current) return
+    setIsGeneratingImage(true)
+    try {
+      // Temporarily hide the close button for the screenshot (we already moved it outside, but just to be safe)
+      const blob = await toBlob(cardRef.current, { cacheBust: true, style: { borderRadius: '0px' } })
+      if (!blob) throw new Error("Gagal membuat gambar")
+      
+      const file = new File([blob], "emitrack-share.png", { type: "image/png" })
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        // Mobile / Supported browsers: Share dialog
+        await navigator.share({
+          files: [file],
+          title: "EmiTrack",
+          text: textToShare
+        })
+      } else {
+        // Fallback for Desktop/Unsupported
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ])
+          alert("✓ Gambar disalin ke clipboard!\n\nSilakan buka WhatsApp Web dan tekan Ctrl+V (Paste) di kolom chat.")
+        } catch (clipErr) {
+          // Absolute fallback: download file
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'emitrack-share.png'
+          a.click()
+          URL.revokeObjectURL(url)
+          alert("✓ Gambar berhasil diunduh (emitrack-share.png)!\n\nSilakan kirim file tersebut di chat WhatsApp.")
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Maaf, gagal memproses gambar.")
+    } finally {
+      setIsGeneratingImage(false)
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-screen text-gray-400">Memuat...</div>
 
   // Gunakan fmtEmisi secara konsisten agar tidak ada perbedaan antara stat cards dan smart comparison
@@ -262,6 +312,13 @@ export default function DashboardPage() {
             <div className="text-xs text-gray-400">{sapaanWaktu()}, {profile?.username || user?.email?.split('@')[0]}!</div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Tombol Bagikan */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1D9E75] bg-[#E1F5EE] rounded-full hover:bg-[#c2ebd9] transition-colors"
+            >
+              <Share className="w-3.5 h-3.5" /> Bagikan
+            </button>
 
             {/* Kota Picker — dropdown dengan API wilayah Indonesia */}
             <div className="relative" ref={kotaRef}>
@@ -347,13 +404,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
           {dataLoading ? (
             <div className="animate-fade-in">
-              <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
               </div>
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-white rounded-xl border border-gray-100 p-4 h-[200px] flex flex-col">
                    <SkeletonText width="w-1/3" className="mb-4" />
                    <div className="flex-1 bg-gray-50 rounded animate-pulse"></div>
@@ -413,7 +470,7 @@ export default function DashboardPage() {
                   Lihat Semua
                 </a>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {topUsers.length > 0 ? topUsers.map((user, i) => {
                   const icons = ['🥇', '🥈', '🥉']
                   const colors = ['bg-amber-100 text-amber-600', 'bg-gray-100 text-gray-600', 'bg-orange-100 text-orange-600']
@@ -436,7 +493,7 @@ export default function DashboardPage() {
             </div>
           </div>
           {/* Stat cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
               {
                 label: 'Emisi Hari Ini',
@@ -480,7 +537,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Chart + Smart comparison */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="bg-white rounded-xl border border-gray-100 p-4">
               <div className="text-sm font-medium text-gray-700 mb-4">Emisi 7 Hari Terakhir (kg CO₂)</div>
               {chartData.length > 0 ? (
@@ -578,6 +635,90 @@ export default function DashboardPage() {
           </>)}
         </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute -top-3 -right-3 z-10 bg-white text-gray-500 hover:text-gray-800 shadow-md p-1.5 rounded-full transition-colors border border-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Preview Card (This gets screenshotted) */}
+            <div ref={cardRef} className="bg-gradient-to-br from-[#085041] to-[#1D9E75] p-6 text-center text-white rounded-t-2xl">
+              
+              <div className="text-xl font-bold tracking-tight mb-4 flex items-center justify-center gap-2">
+                <span className="text-[#FAC775]">🌿</span> EmiTrack
+              </div>
+              
+              <h3 className="text-2xl font-black leading-tight mb-2">
+                Saya hemat<br/>
+                <span className="text-[#FAC775]">{totalHematTrips} kg CO₂!</span>
+              </h3>
+              
+              <p className="text-sm font-medium text-white/90 mb-6">
+                🔥 Streak {profile?.streak ?? 0} hari · ⭐ {poin.toLocaleString()} poin
+              </p>
+              
+              <div className="inline-flex items-center gap-2 bg-black/20 rounded-full px-4 py-1.5 text-xs font-semibold backdrop-blur-sm border border-white/10 shadow-sm">
+                <Award className="w-4 h-4 text-[#FAC775]" /> {levelName}
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="p-5 flex flex-col gap-3 rounded-b-2xl bg-white">
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleShareImage(
+                    `\u{1F33F} Saya sudah hemat ${totalHematTrips} kg CO\u2082 dengan EmiTrack!\n\nYuk ikutan: https://emitrack.vercel.app`
+                  )}
+                  disabled={isGeneratingImage}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1D9E75] text-white font-bold rounded-xl hover:bg-[#0F6E56] transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-sm"
+                >
+                  {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
+                </button>
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `\u{1F33F} Saya sudah hemat ${totalHematTrips} kg CO\u2082 dengan EmiTrack!\n\n` +
+                    `\u{1F525} Streak: ${profile?.streak ?? 0} hari\n` +
+                    `\u{2B50} Poin: ${poin.toLocaleString()}\n\n` +
+                    `Yuk ikut jaga bumi bareng: https://emitrack.vercel.app`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#1DA851] transition-all shadow-sm active:scale-[0.98] text-sm"
+                >
+                  💬 Share Teks WA
+                </a>
+              </div>
+              
+              <div className="flex gap-3 mt-1">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://emitrack.vercel.app')
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className="flex-1 py-3 border-2 border-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all active:scale-[0.98] text-sm"
+                >
+                  {copied ? '✓ Tersalin!' : '📋 Copy Link'}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="flex-1 py-3 text-gray-500 font-medium rounded-xl hover:bg-gray-50 transition-all text-sm"
+                >
+                  ✕ Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
