@@ -33,12 +33,12 @@ export default function HomePage() {
       */}
          <svg
             className="absolute inset-0 w-full h-full z-0 pointer-events-none"
-            viewBox="0 0 1600 900"
+            viewBox="0 0 950 900"
             preserveAspectRatio="none"
             xmlns="http://www.w3.org/2000/svg"
          >
             <path
-               d="M 1600 0 L 1600 900 L 680 900 C 900 259, 595 480, 450 100 C 222 -1000, 666 0, 300 0 Z"
+               d="M 1600 0 L 1600 900 L 500 900 C 780 300, 350 350, 380 0 Z"
                fill="#15594B"
             />
          </svg>
@@ -46,28 +46,28 @@ export default function HomePage() {
          {/* ── Layer konten (di atas SVG) ── */}
          <div className="relative z-10 min-h-screen flex">
             {/* Kiri — area putih, logo di tengah */}
-            <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="flex-1 flex flex-col items-start justify-center pt-10 pl-95">
                <Image
                   src="/EmiTrackLogo2.png"
                   alt="Logo EmiTrack"
-                  width={320}
+                  width={450}
                   height={160}
                   className="object-contain"
                />
             </div>
 
             {/* Kanan — area hijau, konten login */}
-            <div className="w-[46%] flex flex-col justify-center px-20">
-               <h2 className="text-2xl font-semibold text-white mb-1">
+            <div className="w-[30%] flex flex-col justify-center pl-[5px] pr-[170px]">
+               <h2 className="text-5xl font-semibold text-white mb-1 text-center">
                   Masuk ke EmiTrack
                </h2>
-               <p className="text-sm text-gray-300 mb-8">
+               <p className="text-lg text-gray-300 mb-8 text-center">
                   Mulai lacak jejak karbon kamu hari ini
                </p>
 
                <button
                   onClick={signInWithGoogle}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:shadow-lg active:scale-95 transition-all duration-300"
+                  className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-300/90 hover:shadow-lg active:scale-95 transition-all duration-300"
                >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
                      <path
@@ -90,7 +90,7 @@ export default function HomePage() {
                   Masuk dengan Google
                </button>
 
-               <p className="text-center text-xs text-[#E2E8F0] mt-6">
+               <p className="text-center text-sm text-[#E2E8F0] mt-6">
                   Dengan masuk, kamu menyetujui penggunaan data untuk tujuan
                   lingkungan
                </p>
