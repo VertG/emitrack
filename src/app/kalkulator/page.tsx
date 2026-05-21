@@ -20,8 +20,13 @@ const JENIS_KENDARAAN = [
   { value: 'mobil', label: 'Mobil' },
 ]
 
-const MODA_BBM_KEYS = ['sepeda', 'krl', 'transjakarta']
-const MODA_ICONS = [Bike, Train, Bus]
+const PILIHAN_TRANSPORTASI = [
+  { value: 'motor', label: 'Motor', isPrivate: true, icon: Bike, poin: 10 },
+  { value: 'mobil', label: 'Mobil', isPrivate: true, icon: Car, poin: 10 },
+  { value: 'sepeda', label: 'Sepeda', isPrivate: false, icon: Bike, emisiPerKm: 0, poin: 80 },
+  { value: 'krl', label: 'KRL / MRT', isPrivate: false, icon: Train, emisiPerKm: 0.001, poin: 40 },
+  { value: 'transjakarta', label: 'TransJakarta', isPrivate: false, icon: Bus, emisiPerKm: 0.038, poin: 50 },
+]
 
 const HARGA_BBM_DEFAULT: Record<string, number> = {
   ron90: 10000,
@@ -357,11 +362,15 @@ function KalkulatorContent() {
     if (dariPeta) setActiveTab('hitung')
   }, [dariPeta])
 
-  const emisiHarian = hitungEmisi(jenis, bbm, jarak)
+  const selectedModa = PILIHAN_TRANSPORTASI.find(p => p.value === jenis) || PILIHAN_TRANSPORTASI[0]
+
+  const emisiHarian = selectedModa.isPrivate 
+    ? hitungEmisi(jenis, bbm, jarak) 
+    : Number((jarak * (selectedModa.emisiPerKm ?? 0)).toFixed(3))
+
   const emisiBulanan = Number((emisiHarian * 22).toFixed(1))
   const emisiTahunan = Number((emisiHarian * 264).toFixed(0))
   const vsRataRata = Number(((emisiHarian / RATA_RATA_NASIONAL) * 100).toFixed(0))
-  const rekomendasi = rekomendasiRute(emisiHarian, jarak)
 
   async function updateStreak(tambahPoin: number, tambahHemat: number) {
     const { data: profile } = await supabase
@@ -434,46 +443,33 @@ function KalkulatorContent() {
     setSaving(true)
     setSaveError('')
 
-    const emisiDihemat = Math.max(0, Number((RATA_RATA_NASIONAL - emisiHarian).toFixed(3)))
+    let emisiDihemat = 0
+    let poinDidapat = selectedModa.poin || 10
+    let dbJenis = jenis
+    let dbBbm = bbm
+
+    if (selectedModa.isPrivate) {
+      emisiDihemat = Math.max(0, Number((RATA_RATA_NASIONAL - emisiHarian).toFixed(3)))
+    } else {
+      const emisiMotorBaseline = hitungEmisi('motor', 'ron92', jarak)
+      emisiDihemat = Number((emisiMotorBaseline - emisiHarian).toFixed(3))
+      dbJenis = 'transportasi_umum'
+      dbBbm = jenis
+    }
 
     const { error } = await supabase.from('trips').insert({
       user_id: user.id,
-      jenis,
-      bbm,
+      jenis: dbJenis,
+      bbm: dbBbm,
       jarak_km: jarak,
       emisi_kg: emisiHarian,
       emisi_dihemat: emisiDihemat,
-      poin_didapat: 10,
+      poin_didapat: poinDidapat,
     })
 
     if (error) { setSaveError(error.message); setSaving(false); return }
 
-    await updateStreak(10, emisiDihemat)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3500)
-  }
-
-  async function simpanModaAlternatif(bbmKey: string, emisiModa: number, hemat: number, poin: number) {
-    if (!user) return
-    setSaving(true)
-    setSaveError('')
-
-    const emisiDihemat = Number(hemat.toFixed(3))
-
-    const { error } = await supabase.from('trips').insert({
-      user_id: user.id,
-      jenis: 'transportasi_umum',
-      bbm: bbmKey,
-      jarak_km: jarak,
-      emisi_kg: Number(emisiModa.toFixed(3)),
-      emisi_dihemat: emisiDihemat,
-      poin_didapat: poin,
-    })
-
-    if (error) { setSaveError(error.message); setSaving(false); return }
-
-    await updateStreak(poin, emisiDihemat)
+    await updateStreak(poinDidapat, emisiDihemat)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3500)
@@ -518,23 +514,26 @@ function KalkulatorContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Form kiri */}
               <div className="space-y-4">
-                {/* Jenis kendaraan */}
+                {/* Moda Transportasi */}
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Jenis Kendaraan</div>
-                  <div className="flex gap-2">
-                    {JENIS_KENDARAAN.map(k => (
+                  <div className="text-sm font-medium text-gray-700 mb-3">Moda Transportasi</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {PILIHAN_TRANSPORTASI.map(k => {
+                      const Icon = k.icon;
+                      return (
                       <button key={k.value} onClick={() => { setJenis(k.value); setBbm('ron92') }}
-                        className={`flex-1 flex justify-center items-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
+                        className={`flex justify-center items-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
                           ? 'bg-[#1D9E75] text-white'
                           : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                           }`}>
-                        {k.value === 'motor' ? <Bike size={16} /> : <Car size={16} />} {k.label}
+                        <Icon size={16} /> {k.label}
                       </button>
-                    ))}
+                    )})}
                   </div>
                 </div>
 
                 {/* Bahan bakar */}
+                {selectedModa.isPrivate && (
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="text-sm font-medium text-gray-700 mb-3">Bahan Bakar</div>
                   <div className={`grid grid-cols-2 ${jenis === 'motor' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-2`}>
@@ -567,6 +566,7 @@ function KalkulatorContent() {
                     </Link>
                   </div>
                 </div>
+                )}
 
                 {/* Jarak */}
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -609,6 +609,7 @@ function KalkulatorContent() {
                 </div>
 
                 {/* Rumus */}
+                {selectedModa.isPrivate && (
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="text-xs text-gray-400 mb-2">Rumus Kalkulasi (IPCC 2021)</div>
                   <div className="font-mono text-sm bg-gray-50 rounded-lg px-3 py-2.5 text-[#1D9E75] border-l-2 border-[#1D9E75]">
@@ -620,6 +621,7 @@ function KalkulatorContent() {
                     <div>FK = Konsumsi bahan bakar (liter/km)</div>
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Hasil kanan */}
@@ -648,38 +650,6 @@ function KalkulatorContent() {
                   </div>
                 </div>
 
-                {/* Rekomendasi */}
-                <div className="bg-white rounded-xl border border-gray-100 p-4">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Alternatif Transportasi</div>
-                  <div className="space-y-2">
-                    {rekomendasi.map((r, i) => (
-                      <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100'
-                        }`}>
-                        {(() => {
-                          const Icon = MODA_ICONS[i];
-                          return <Icon size={24} className={i === 0 ? "text-[#1D9E75]" : "text-gray-500"} />;
-                        })()}
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-700">{r.moda}</div>
-                          <div className="text-xs text-gray-400">
-                            {r.estimasiWaktu} mnt · <span className="text-[#1D9E75]">{r.emisi} kg CO₂</span>
-                          </div>
-                        </div>
-                        <div className="text-right mr-2">
-                          <div className="text-xs text-[#1D9E75] font-medium">Hemat {r.hemat.toFixed(2)} kg</div>
-                          <div className="text-xs text-amber-500">+{r.poin} poin</div>
-                        </div>
-                        <button
-                          onClick={() => simpanModaAlternatif(MODA_BBM_KEYS[i], r.emisi, r.hemat, r.poin)}
-                          disabled={saving}
-                          className="shrink-0 text-xs bg-[#1D9E75] text-white px-3 py-1.5 rounded-lg hover:bg-[#0F6E56] transition-colors disabled:opacity-50">
-                          Catat
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 {saveError && (
                   <div className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                     ⚠️ {saveError}
@@ -693,7 +663,7 @@ function KalkulatorContent() {
                     : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
                     }`}>
                   {saving && <Spinner />}
-                  {saving ? 'Menyimpan...' : saved ? <><Check size={16} /> Tersimpan! +10 poin</> : 'Simpan Perjalanan (+10 poin)'}
+                  {saving ? 'Menyimpan...' : saved ? <><Check size={16} /> Tersimpan! +{selectedModa.poin} poin</> : `Simpan Perjalanan (+${selectedModa.poin} poin)`}
                 </button>
               </div>
             </div>
