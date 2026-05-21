@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
@@ -24,12 +25,17 @@ const BBM_OPTIONS: Record<string, { value: string; label: string }[]> = {
 }
 
 export default function KalkulatorPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [jenis, setJenis] = useState('motor')
   const [bbm, setBbm] = useState('pertalite')
   const [jarak, setJarak] = useState(20)
   const [loading, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && !user) router.push('/')
+  }, [user, authLoading, router])
 
   const emisiHarian = hitungEmisi(jenis, bbm, jarak)
   const emisiBulanan = Number((emisiHarian * 22).toFixed(1))

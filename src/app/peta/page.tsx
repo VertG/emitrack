@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/context/AuthContext'
 import { rekomendasiRute, hitungEmisi } from '@/lib/emisi'
 
 const LOKASI_PRESET: Record<string, [number, number]> = {
@@ -43,6 +45,8 @@ async function ambilRuteOSRM(dari: [number, number], ke: [number, number]) {
 }
 
 export default function PetaPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<any>(null)
   const markersRef = useRef<any[]>([])
@@ -60,6 +64,10 @@ export default function PetaPage() {
   const [mapReady, setMapReady] = useState(false)
   const [loadingRute, setLoadingRute] = useState(false)
   const [errorRute, setErrorRute] = useState('')
+
+  useEffect(() => {
+    if (!authLoading && !user) router.push('/')
+  }, [user, authLoading, router])
 
   useEffect(() => {
     if (mapInstance.current || !mapRef.current) return

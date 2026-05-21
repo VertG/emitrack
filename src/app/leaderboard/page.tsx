@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 
@@ -14,10 +15,15 @@ type RankEntry = {
 }
 
 export default function LeaderboardPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [ranking, setRanking] = useState<RankEntry[]>([])
   const [userRank, setUserRank] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!authLoading && !user) router.push('/')
+  }, [user, authLoading, router])
 
   useEffect(() => {
     fetchLeaderboard()

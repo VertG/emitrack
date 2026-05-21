@@ -187,7 +187,7 @@ export default function DashboardPage() {
                     <XAxis dataKey="hari" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={30} />
                     <Tooltip
-                      formatter={(v: number) => [`${v} kg CO₂`, 'Emisi']}
+                      formatter={(v) => [`${v} kg CO₂`, 'Emisi']}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: '0.5px solid #e5e7eb' }}
                     />
                     <Bar dataKey="emisi" fill="#1D9E75" radius={[4, 4, 0, 0]} />
