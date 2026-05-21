@@ -158,16 +158,24 @@ export default function LeaderboardPage() {
       setUserGlobalRank(above + 1)
     }
 
+    // Helper untuk menyamakan nama kota (hiraukan case dan awalan kota/kabupaten)
+    const isSameCity = (a: string | undefined | null, b: string | undefined | null) => {
+      if (!a || !b) return false
+      const cleanA = a.toLowerCase().replace(/^(kota|kabupaten)\s+/i, '').trim()
+      const cleanB = b.toLowerCase().replace(/^(kota|kabupaten)\s+/i, '').trim()
+      return cleanA === cleanB
+    }
+
     // 3. Kota filter ranking
     const userKota = me?.kota ?? ''
     if (userKota) {
-      const kotaProfiles = enriched.filter(p => p.kota === userKota)
+      const kotaProfiles = enriched.filter(p => isSameCity(p.kota, userKota))
       setKotaRanking(sortByHemat(kotaProfiles).slice(0, 20))
     }
 
     // 4. Sekitar filter ranking
     if (detectedCity) {
-      const sekitarProfiles = enriched.filter(p => p.kota === detectedCity)
+      const sekitarProfiles = enriched.filter(p => isSameCity(p.kota, detectedCity))
       setSekitarRanking(sortByHemat(sekitarProfiles).slice(0, 20))
     }
 

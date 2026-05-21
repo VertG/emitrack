@@ -1,5 +1,11 @@
+export function toTitleCase(str: string): string {
+  return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase())
+    .replace(/\bdki\b/gi, 'DKI')
+    .replace(/\bdi\b/gi, 'DI')
+}
+
 export async function getUserCity(fallbackCity?: string): Promise<string> {
-  const fallback = fallbackCity || 'Jakarta'
+  const fallback = fallbackCity ? toTitleCase(fallbackCity) : 'Jakarta'
 
   // Try HTML5 Geolocation first for accurate local city
   if (typeof window !== 'undefined' && 'geolocation' in navigator) {
@@ -17,8 +23,7 @@ export async function getUserCity(fallbackCity?: string): Promise<string> {
                                 data.address?.state_district || 
                                 data.address?.town
               if (foundCity) {
-                // Remove prefixes like "Kota", "Kabupaten" to match database
-                resolve(foundCity.replace(/^(Kabupaten|Kota)\s+/i, '').trim())
+                resolve(toTitleCase(foundCity.trim()))
               } else {
                 reject(new Error('City not found in Nominatim'))
               }
@@ -42,7 +47,7 @@ export async function getUserCity(fallbackCity?: string): Promise<string> {
     const res = await fetch('https://ipapi.co/json/')
     if (!res.ok) return fallback
     const data = await res.json()
-    return data.city || fallback
+    return data.city ? toTitleCase(data.city) : fallback
   } catch (err) {
     return fallback
   }
