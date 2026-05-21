@@ -646,40 +646,78 @@ export default function DashboardPage() {
 
       {/* Share Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowShareModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl relative" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowShareModal(false)}>
+          <div className="flex flex-col items-center w-full max-w-[340px] relative" onClick={e => e.stopPropagation()}>
             
             <button 
               onClick={() => setShowShareModal(false)}
-              className="absolute -top-3 -right-3 z-10 bg-white text-gray-500 hover:text-gray-800 shadow-md p-1.5 rounded-full transition-colors border border-gray-100"
+              className="absolute -top-12 right-0 z-10 text-white hover:text-gray-200 transition-colors bg-white/10 rounded-full p-2"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Preview Card (This gets screenshotted) */}
-            <div ref={cardRef} className="bg-gradient-to-br from-[#085041] to-[#1D9E75] p-6 text-center text-white rounded-t-2xl">
+            <div ref={cardRef} className="relative w-full aspect-[9/16] bg-gradient-to-b from-[#1D9E75] via-[#085041] to-[#042820] overflow-hidden flex flex-col justify-between p-6 rounded-2xl shadow-2xl">
+              {/* Background decorative elements */}
+              <div className="absolute top-[-50px] left-[-50px] w-48 h-48 bg-[#FAC775] opacity-20 rounded-full blur-3xl" />
+              <div className="absolute bottom-[-50px] right-[-50px] w-64 h-64 bg-[#1D9E75] opacity-40 rounded-full blur-3xl" />
               
-              <div className="text-xl font-bold tracking-tight mb-4 flex items-center justify-center gap-2">
-                <span className="text-[#FAC775]">🌿</span> EmiTrack
+              {/* Top part */}
+              <div className="relative z-10 flex items-center justify-between mt-2 mb-8 w-full px-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/EmiTrackLogo3.png" alt="EmiTrack" className="h-20 object-contain drop-shadow-md brightness-0 invert scale-110 origin-left" />
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-[11px] font-bold text-[#FAC775] uppercase tracking-widest shadow-xl whitespace-nowrap">
+                  EmiTrack {new Date().getFullYear()} Wrapped
+                </div>
               </div>
               
-              <h3 className="text-2xl font-black leading-tight mb-2">
-                Saya hemat<br/>
-                <span className="text-[#FAC775]">{totalHematTrips} kg CO₂!</span>
-              </h3>
-              
-              <p className="text-sm font-medium text-white/90 mb-6">
-                🔥 Streak {profile?.streak ?? 0} hari · ⭐ {poin.toLocaleString()} poin
-              </p>
-              
-              <div className="inline-flex items-center gap-2 bg-black/20 rounded-full px-4 py-1.5 text-xs font-semibold backdrop-blur-sm border border-white/10 shadow-sm">
-                <Award className="w-4 h-4 text-[#FAC775]" /> {levelName}
+              <div className="relative z-10 flex flex-col items-center">
+                <h3 className="text-3xl font-black leading-tight text-center drop-shadow-lg text-white">
+                  Saya berhasil<br/>menghemat
+                </h3>
+                <div className="mt-4 mb-2">
+                  <span className="text-6xl font-black text-[#FAC775] drop-shadow-md">
+                    {totalHematTrips}
+                  </span>
+                </div>
+                <div className="text-xl font-bold text-[#E1F5EE] tracking-wide">kg CO₂</div>
+              </div>
+
+              {/* Bottom part / Stats */}
+              <div className="relative z-10 flex flex-col gap-3">
+                <div className="w-full bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-xl flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-[#FAC775]" />
+                      <span className="text-xs font-semibold text-white/90">Level Pahlawan</span>
+                    </div>
+                    <div className="text-sm font-bold text-white">{levelName}</div>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⭐</span>
+                      <span className="text-xs font-semibold text-white/90">Total Poin</span>
+                    </div>
+                    <div className="text-sm font-bold text-[#FAC775]">{poin.toLocaleString()}</div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🔥</span>
+                      <span className="text-xs font-semibold text-white/90">Streak Aktif</span>
+                    </div>
+                    <div className="text-sm font-bold text-white">{profile?.streak ?? 0} hari</div>
+                  </div>
+                </div>
+
+                {/* Footer text */}
+                <div className="text-center text-[9px] font-medium text-white/50 tracking-widest uppercase mt-2">
+                  {profile?.username ? `@${profile.username}` : 'Pahlawan Bumi'} • emitrack.vercel.app
+                </div>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="p-5 flex flex-col gap-3 rounded-b-2xl bg-white">
-              
+            <div className="w-full flex flex-col gap-3 mt-6 bg-white rounded-2xl p-4 shadow-xl">
               <div className="flex gap-2">
                 <button
                   onClick={() => handleShareImage(
@@ -690,19 +728,27 @@ export default function DashboardPage() {
                 >
                   {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
                 </button>
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `\u{1F33F} Saya sudah hemat ${totalHematTrips} kg CO\u2082 dengan EmiTrack!\n\n` +
-                    `\u{1F525} Streak: ${profile?.streak ?? 0} hari\n` +
-                    `\u{2B50} Poin: ${poin.toLocaleString()}\n\n` +
-                    `Yuk ikut jaga bumi bareng: https://emitrack.vercel.app`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#1DA851] transition-all shadow-sm active:scale-[0.98] text-sm"
+                <button
+                  onClick={async () => {
+                    const shareText = `\u{1F33F} Saya sudah hemat ${totalHematTrips} kg CO\u2082 dengan EmiTrack!\n\n\u{1F525} Streak: ${profile?.streak ?? 0} hari\n\u{2B50} Poin: ${poin.toLocaleString()}\n\nYuk ikut jaga bumi bareng: https://emitrack.vercel.app`;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({
+                          title: 'Pencapaian EmiTrack',
+                          text: shareText
+                        });
+                      } catch (err) {
+                        // User cancelled or failed
+                      }
+                    } else {
+                      navigator.clipboard.writeText(shareText);
+                      alert("Teks berhasil disalin ke clipboard!");
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-all shadow-sm active:scale-[0.98] text-sm"
                 >
-                  💬 Share Teks WA
-                </a>
+                  💬 Share Teks
+                </button>
               </div>
               
               <div className="flex gap-3 mt-1">

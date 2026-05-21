@@ -90,6 +90,7 @@ export default function LeaderboardPage() {
   // Share Modal State
   const [showShareModal, setShowShareModal] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [copied, setCopied] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -654,67 +655,119 @@ export default function LeaderboardPage() {
 
       {/* Share Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowShareModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl relative" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowShareModal(false)}>
+          <div className="flex flex-col items-center w-full max-w-[340px] relative" onClick={e => e.stopPropagation()}>
             
             <button 
               onClick={() => setShowShareModal(false)}
-              className="absolute -top-3 -right-3 z-10 bg-white text-gray-500 hover:text-gray-800 shadow-md p-1.5 rounded-full transition-colors border border-gray-100"
+              className="absolute -top-12 right-0 z-10 text-white hover:text-gray-200 transition-colors bg-white/10 rounded-full p-2"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Preview Card (This gets screenshotted) */}
-            <div ref={cardRef} className="bg-gradient-to-br from-[#085041] to-[#1D9E75] p-8 text-center text-white rounded-t-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-xl"></div>
+            <div ref={cardRef} className="relative w-full aspect-[9/16] bg-gradient-to-b from-[#1D9E75] via-[#085041] to-[#042820] overflow-hidden flex flex-col justify-between p-6 rounded-2xl shadow-2xl">
+              {/* Background decorative elements */}
+              <div className="absolute top-[-50px] left-[-50px] w-48 h-48 bg-[#FAC775] opacity-20 rounded-full blur-3xl" />
+              <div className="absolute bottom-[-50px] right-[-50px] w-64 h-64 bg-[#1D9E75] opacity-40 rounded-full blur-3xl" />
               
-              <div className="text-lg font-bold tracking-tight mb-4 flex items-center justify-center gap-1.5 opacity-90">
-                <span className="text-[#FAC775]">🌿</span> EmiTrack
+              {/* Top part */}
+              <div className="relative z-10 flex items-center justify-between mt-2 mb-8 w-full px-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/EmiTrackLogo3.png" alt="EmiTrack" className="h-20 object-contain drop-shadow-md brightness-0 invert scale-110 origin-left" />
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-[11px] font-bold text-[#FAC775] uppercase tracking-widest shadow-xl whitespace-nowrap">
+                  EmiTrack {new Date().getFullYear()} Wrapped
+                </div>
               </div>
-              
-              <div className="w-20 h-20 rounded-full bg-white/10 mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner border border-white/10">
-                {meInCurrentRanking === 0 ? '🥇' : meInCurrentRanking === 1 ? '🥈' : meInCurrentRanking === 2 ? '🥉' : '🏆'}
+
+              <div className="relative z-10 flex flex-col items-center flex-1 justify-center -mt-6">
+                <div className="w-24 h-24 rounded-full bg-white/10 mx-auto mb-5 flex items-center justify-center text-5xl shadow-inner border border-white/10 backdrop-blur-sm">
+                  {meInCurrentRanking === 0 ? '🥇' : meInCurrentRanking === 1 ? '🥈' : meInCurrentRanking === 2 ? '🥉' : '🏆'}
+                </div>
+                <div className="text-[10px] font-bold text-[#FAC775] uppercase tracking-widest mb-3 bg-black/20 px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+                  Leaderboard {tab === 'semua' ? 'Global' : tab === 'kota' ? 'Kota' : 'Sekitar'}
+                </div>
+                
+                <h3 className="text-6xl font-black leading-tight mb-3 text-white drop-shadow-lg">
+                  Top {meInCurrentRanking + 1}
+                </h3>
+                
+                <p className="text-sm font-medium text-white/80 mb-6 px-4 text-center">
+                  dari {stats?.totalUser ?? 0} peserta.<br/>Luar biasa!
+                </p>
               </div>
-              
-              <div className="text-sm font-medium text-amber-200 uppercase tracking-widest mb-1">
-                Leaderboard {tab === 'semua' ? 'Global' : tab === 'kota' ? 'Kota' : 'Sekitar'}
-              </div>
-              
-              <h3 className="text-3xl font-black leading-tight mb-3">
-                Top {meInCurrentRanking + 1}
-              </h3>
-              
-              <p className="text-xs font-medium text-white/80 mb-6 px-4">
-                dari {stats?.totalUser ?? 0} peserta. Luar biasa!
-              </p>
-              
-              <div className="inline-flex items-center gap-2 bg-black/20 rounded-full px-5 py-2 text-sm font-semibold backdrop-blur-sm border border-white/10 shadow-sm text-[#FAC775]">
-                Hemat {(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO₂
+
+              {/* Bottom part / Stats */}
+              <div className="relative z-10 flex flex-col gap-3">
+                <div className="w-full bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-xl flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🌍</span>
+                      <span className="text-xs font-semibold text-white/90">Total Hemat Emisi</span>
+                    </div>
+                    <div className="text-sm font-bold text-[#FAC775]">{(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO₂</div>
+                  </div>
+                </div>
+
+                {/* Footer text */}
+                <div className="text-center text-[9px] font-medium text-white/50 tracking-widest uppercase mt-2">
+                  {userProfile?.username ? `@${userProfile.username}` : 'Pahlawan Bumi'} • emitrack.vercel.app
+                </div>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="p-5 flex flex-col gap-3 rounded-b-2xl bg-white">
+            <div className="w-full flex flex-col gap-3 mt-6 bg-white rounded-2xl p-4 shadow-xl">
               <div className="flex gap-2">
                 <button
                   onClick={() => handleShareImage(
-                    `\u{1F3C6} Wah! Aku berhasil tembus Top ${meInCurrentRanking + 1} di EmiTrack! Total emisi yang kuhemat: ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082! \u{1F60E}\n\nYuk, mulai langkah kecilmu untuk bumi yang lebih baik: https://emitrack.vercel.app`
+                    `\u{1F33F} Saya masuk Top ${meInCurrentRanking + 1} Leaderboard EmiTrack dengan total hemat ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082!\n\nYuk ikutan: https://emitrack.vercel.app`
                   )}
                   disabled={isGeneratingImage}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1D9E75] text-white font-bold rounded-xl hover:bg-[#0F6E56] transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-sm"
                 >
                   {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
                 </button>
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `\u{1F3C6} Wah! Aku berhasil tembus Top ${meInCurrentRanking + 1} di EmiTrack! Total emisi yang kuhemat: ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082! \u{1F60E}\n\nYuk, mulai langkah kecilmu untuk bumi yang lebih baik: https://emitrack.vercel.app`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#1DA851] transition-all shadow-sm active:scale-[0.98] text-sm"
+                <button
+                  onClick={async () => {
+                    const shareText = `\u{1F33F} Saya masuk Top ${meInCurrentRanking + 1} Leaderboard EmiTrack dengan total hemat ${(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO\u2082!\n\nYuk ikut jaga bumi bareng: https://emitrack.vercel.app`;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({
+                          title: 'Pencapaian Leaderboard EmiTrack',
+                          text: shareText
+                        });
+                      } catch (err) {
+                        // User cancelled or failed
+                      }
+                    } else {
+                      navigator.clipboard.writeText(shareText);
+                      alert("Teks berhasil disalin ke clipboard!");
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-all shadow-sm active:scale-[0.98] text-sm"
                 >
                   💬 Share Teks
-                </a>
+                </button>
+              </div>
+              
+              <div className="flex gap-3 mt-1">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://emitrack.vercel.app')
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className="flex-1 py-3 border-2 border-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all active:scale-[0.98] text-sm"
+                >
+                  {copied ? '✓ Tersalin!' : '📋 Copy Link'}
+                </button>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="flex-1 py-3 text-gray-500 font-medium rounded-xl hover:bg-gray-50 transition-all text-sm"
+                >
+                  ✕ Tutup
+                </button>
               </div>
             </div>
           </div>
