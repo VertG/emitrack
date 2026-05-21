@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { X } from 'lucide-react'
 
 export type ToastType = 'success' | 'info' | 'warning'
 
@@ -79,7 +80,7 @@ export default function ToastContainer() {
             onClick={() => dismiss(t.id)}
             className="text-white/70 hover:text-white transition-colors ml-1 text-xs"
           >
-            ✕
+            <X size={14} />
           </button>
         </div>
       ))}

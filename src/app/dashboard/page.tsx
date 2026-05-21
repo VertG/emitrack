@@ -9,9 +9,10 @@ import Sidebar from '@/components/Sidebar'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { toBlob } from 'html-to-image'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift, Share, X } from 'lucide-react'
+import { CheckCircle2, TreePine, Award, Zap, ChevronRight, Gift, Share, X, MapPin, Flame, Leaf, Sprout, Medal, Trophy, Star, Car, Bike, Bus, Train, Copy, MessageSquare, Smartphone, Image as ImageIcon } from 'lucide-react'
 import { getUserCity } from '@/lib/location'
-
+import { getLevelByPoin } from '@/lib/level'
+import LevelBadge from '@/components/LevelBadge'
 type Trip = {
   id: string
   jenis: string
@@ -76,7 +77,7 @@ export default function DashboardPage() {
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!loading && !user) router.push('/')
+    if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
   useEffect(() => {
@@ -275,38 +276,24 @@ export default function DashboardPage() {
   let smartBtnLink = ''
 
   if (todayTrips.length === 0) {
-    smartMsg = 'Belum ada perjalanan hari ini. Mulai catat perjalananmu dan lihat dampak emisimu! 🌱'
+    smartMsg = 'Belum ada perjalanan hari ini. Mulai catat perjalananmu dan lihat dampak emisimu!'
     smartBtnText = 'Catat Perjalanan →'
     smartBtnLink = '/kalkulator'
   } else if (tripHijauHariIni > 0) {
     // Pohon dewasa serap ~21kg/tahun = ~0.0575kg/hari. Total hemat harian dibagi 0.0575.
     const pohon = Math.floor(totalHematHariIni / 0.0575)
-    smartMsg = `${totalHematHariIni} kg CO₂ yang kamu hemat hari ini setara dengan kemampuan serap ${pohon} Pohon Mahoni 🌳`
+    smartMsg = `${totalHematHariIni} kg CO₂ yang kamu hemat hari ini setara dengan kemampuan serap ${pohon} Pohon Mahoni`
     smartBtnText = 'Lihat Leaderboard'
     smartBtnLink = '/leaderboard'
   } else {
     const hematEstimasi = fmtEmisi(emisiHariIni * 0.94)
     const pohon = Math.floor(hematEstimasi / 0.0575)
-    smartMsg = `Jika kamu naik transportasi umum, ${hematEstimasi} kg CO₂ yang kamu hemat setara dengan ${pohon} Pohon Mahoni 🌳`
+    smartMsg = `Jika kamu naik transportasi umum, ${hematEstimasi} kg CO₂ yang kamu hemat setara dengan ${pohon} Pohon Mahoni`
     smartBtnText = 'Coba Rute Hijau'
     smartBtnLink = '/peta'
   }
 
-  // Leveling Logic
   const poin = profile?.total_poin ?? 0
-  let levelName = '🌱 Pemula Hijau'
-  let levelNext = 100
-  let levelNum = 1
-  if (poin >= 100 && poin < 500) {
-    levelName = '🥉 Bronze Commuter'
-    levelNext = 500
-    levelNum = 2
-  } else if (poin >= 500) {
-    levelName = '🥈 Silver Commuter'
-    levelNext = 1500
-    levelNum = 3
-  }
-
   const targetHarian = 3
   const progressPercent = Math.min((emisiHariIni / targetHarian) * 100, 100)
   const isOverLimit = emisiHariIni > targetHarian
@@ -337,7 +324,7 @@ export default function DashboardPage() {
                 className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1.5 hover:bg-gray-200 transition-colors"
                 title="Ubah kota"
               >
-                📍 {profile?.kota || 'Pilih Kota'} <span className="opacity-40 text-[10px]">▾</span>
+                <MapPin size={14} className="text-gray-400" /> {profile?.kota || 'Pilih Kota'} <span className="opacity-40 text-[10px]">▾</span>
               </button>
 
               {kotaOpen && (
@@ -402,9 +389,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-1.5 bg-[#FFEDD5] text-[#EA580C] text-xs font-bold px-3 py-1.5 rounded-full shadow-sm border border-[#FDBA74]/50">
-              <span className="text-sm">🔥</span> 
+              <Flame size={14} className="text-[#EA580C]" strokeWidth={2.5} /> 
               <span>{profile?.streak ?? 0}</span>
             </div>
+            <LevelBadge poin={profile?.total_poin ?? 0} size="sm" />
             <div className="w-8 h-8 rounded-full bg-[#1D9E75] flex items-center justify-center text-white text-xs font-bold shadow-sm border border-[#1D9E75]/20">
               {(profile?.username || user?.email || 'U')[0].toUpperCase()}
             </div>
@@ -439,31 +427,9 @@ export default function DashboardPage() {
 
           {/* Gamification Top Row: Profile & Leaderboard Preview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {/* Profile Leveling Card */}
-            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="w-12 h-12 rounded-full bg-[#E1F5EE] border-2 border-[#1D9E75]/20 flex items-center justify-center text-[#1D9E75]">
-                  <Award className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-0.5">Level {levelNum}</div>
-                  <div className="text-[15px] font-bold text-gray-800">{levelName}</div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center text-xs text-gray-500 mb-2 font-medium">
-                  <span>{poin.toLocaleString()} Poin</span>
-                  <span className="text-gray-400">{levelNext.toLocaleString()} Poin</span>
-                </div>
-                <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-[#1D9E75] rounded-full transition-all duration-1000"
-                    style={{ width: `${Math.min((poin / levelNext) * 100, 100)}%` }}
-                  />
-                </div>
-                <div className="text-[10px] text-gray-400 mt-2.5 text-center">
-                  Butuh <span className="font-bold text-gray-600">{Math.max(levelNext - poin, 0)} poin</span> lagi untuk naik level!
-                </div>
+            <div className="flex h-full min-h-[140px]">
+              <div className="w-full h-full">
+                <LevelBadge poin={poin} size="lg" />
               </div>
             </div>
 
@@ -471,7 +437,7 @@ export default function DashboardPage() {
             <div className="md:col-span-2 bg-white rounded-xl border border-gray-100 p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
-                  <span className="text-lg">🏆</span>
+                  <Trophy size={20} className="text-[#FAC775]" strokeWidth={2.5} />
                   Pahlawan Bumi Minggu Ini
                 </div>
                 <a href="/leaderboard" className="text-[11px] bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">
@@ -480,7 +446,6 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {topUsers.length > 0 ? topUsers.map((user, i) => {
-                  const icons = ['🥇', '🥈', '🥉']
                   const colors = ['bg-amber-100 text-amber-600', 'bg-gray-100 text-gray-600', 'bg-orange-100 text-orange-600']
                   return (
                     <div key={user.id} className="flex flex-col items-center justify-center p-3 rounded-lg border border-gray-50 bg-gray-50/50 hover:bg-gray-50 transition-colors">
@@ -488,7 +453,11 @@ export default function DashboardPage() {
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${colors[i] || 'bg-blue-100 text-blue-600'}`}>
                           {(user.username || user.id || 'U')[0].toUpperCase()}
                         </div>
-                        <div className="absolute -bottom-1.5 -right-1.5 text-sm drop-shadow-sm">{icons[i] || '⭐'}</div>
+                        <div className="absolute -bottom-1.5 -right-1.5 text-sm drop-shadow-sm">
+                          {i === 0 ? <Medal size={16} className="text-amber-500 fill-amber-500" /> : 
+                           i === 1 ? <Medal size={16} className="text-gray-400 fill-gray-400" /> : 
+                           i === 2 ? <Medal size={16} className="text-orange-500 fill-orange-500" /> : <Star size={16} className="text-blue-500 fill-blue-500" />}
+                        </div>
                       </div>
                       <div className="text-xs font-semibold text-gray-700 w-full text-center truncate">{user.username || 'User'}</div>
                       <div className="text-[10px] font-medium text-[#1D9E75] mt-0.5">{user.total_poin ?? 0} pts</div>
@@ -524,7 +493,11 @@ export default function DashboardPage() {
                 label: 'Poin Gamifikasi',
                 val: (profile?.total_poin ?? 0).toLocaleString(),
                 sub: 'poin total',
-                extra: 'Per trip: Sepeda +80, Trans +50, KRL +40',
+                extra: (
+                  <div className="mt-1">
+                    <LevelBadge poin={profile?.total_poin ?? 0} size="sm" />
+                  </div>
+                ),
                 color: 'text-amber-500',
               },
               {
@@ -543,6 +516,8 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+
+
 
           {/* Chart + Smart comparison */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -623,11 +598,11 @@ export default function DashboardPage() {
                 {trips.slice(0, 5).map(t => (
                   <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">
-                        {t.jenis === 'motor' ? '🏍️' : t.jenis === 'transportasi_umum'
-                          ? (t.bbm === 'sepeda' ? '🚲' : t.bbm === 'krl' ? '🚆' : t.bbm === 'transjakarta' ? '🚌' : '🚃')
-                          : '🚗'}
-                      </span>
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center">
+                        {t.jenis === 'motor' ? <Bike size={18} className="text-gray-500" /> : t.jenis === 'transportasi_umum'
+                          ? (t.bbm === 'sepeda' ? <Bike size={18} className="text-[#1D9E75]" /> : (t.bbm === 'krl' || t.bbm === 'mrt') ? <Train size={18} className="text-[#1D9E75]" /> : <Bus size={18} className="text-[#1D9E75]" />)
+                          : <Car size={18} className="text-gray-500" />}
+                      </div>
                       <div>
                         <div className="text-sm text-gray-700 capitalize">{t.jenis.replace('_', ' ')} — {t.bbm}</div>
                         <div className="text-xs text-gray-400">{t.jarak_km} km · {new Date(t.created_at).toLocaleDateString('id-ID')}</div>
@@ -663,9 +638,9 @@ export default function DashboardPage() {
               <div className="absolute bottom-[-50px] right-[-50px] w-64 h-64 bg-[#1D9E75] opacity-40 rounded-full blur-3xl" />
               
               {/* Top part */}
-              <div className="relative z-10 flex items-center justify-between mt-2 mb-8 w-full px-1">
+              <div className="relative z-10 flex flex-col items-center mt-2 mb-8 w-full gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/EmiTrackLogo3.png" alt="EmiTrack" className="h-20 object-contain drop-shadow-md brightness-0 invert scale-110 origin-left" />
+                <img src="/EmiTrackLogo1.png" alt="EmiTrack" className="h-8 object-contain drop-shadow-md brightness-0 invert" />
                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-[11px] font-bold text-[#FAC775] uppercase tracking-widest shadow-xl whitespace-nowrap">
                   EmiTrack {new Date().getFullYear()} Wrapped
                 </div>
@@ -691,18 +666,18 @@ export default function DashboardPage() {
                       <Award className="w-4 h-4 text-[#FAC775]" />
                       <span className="text-xs font-semibold text-white/90">Level Pahlawan</span>
                     </div>
-                    <div className="text-sm font-bold text-white">{levelName}</div>
+                    <div className="text-sm font-bold text-white">{getLevelByPoin(poin).nama}</div>
                   </div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">⭐</span>
+                      <Star size={16} className="text-[#FAC775] fill-[#FAC775]" />
                       <span className="text-xs font-semibold text-white/90">Total Poin</span>
                     </div>
                     <div className="text-sm font-bold text-[#FAC775]">{poin.toLocaleString()}</div>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🔥</span>
+                      <Flame size={16} className="text-[#EA580C] fill-[#EA580C]" />
                       <span className="text-xs font-semibold text-white/90">Streak Aktif</span>
                     </div>
                     <div className="text-sm font-bold text-white">{profile?.streak ?? 0} hari</div>
@@ -726,7 +701,7 @@ export default function DashboardPage() {
                   disabled={isGeneratingImage}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1D9E75] text-white font-bold rounded-xl hover:bg-[#0F6E56] transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-sm"
                 >
-                  {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
+                  {isGeneratingImage ? 'Memproses...' : <><ImageIcon size={16} /> Share Gambar</>}
                 </button>
                 <button
                   onClick={async () => {
@@ -747,7 +722,7 @@ export default function DashboardPage() {
                   }}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-all shadow-sm active:scale-[0.98] text-sm"
                 >
-                  💬 Share Teks
+                  <MessageSquare size={16} /> Share Teks
                 </button>
               </div>
               
@@ -760,13 +735,13 @@ export default function DashboardPage() {
                   }}
                   className="flex-1 py-3 border-2 border-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all active:scale-[0.98] text-sm"
                 >
-                  {copied ? '✓ Tersalin!' : '📋 Copy Link'}
+                  {copied ? <span className="flex items-center justify-center gap-2"><CheckCircle2 size={16} /> Tersalin!</span> : <span className="flex items-center justify-center gap-2"><Copy size={16} /> Copy Link</span>}
                 </button>
                 <button
                   onClick={() => setShowShareModal(false)}
                   className="flex-1 py-3 text-gray-500 font-medium rounded-xl hover:bg-gray-50 transition-all text-sm"
                 >
-                  ✕ Tutup
+                  <span className="flex items-center justify-center gap-1.5"><X size={16} /> Tutup</span>
                 </button>
               </div>
             </div>

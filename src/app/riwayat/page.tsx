@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { FAKTOR_EMISI, KONSUMSI, LABEL_BBM, CONTOH_MEREK } from '@/lib/emisi'
 import Sidebar from '@/components/Sidebar'
 import { SkeletonRow } from '@/components/Skeleton'
+import { Bike, Car, Bus, Leaf, Map, X } from 'lucide-react'
 
 type Trip = {
   id: string
@@ -30,10 +31,10 @@ const MODA_UMUM_LABEL: Record<string, string> = {
   sepeda: 'Sepeda',
 }
 
-const JENIS_ICON: Record<string, string> = {
-  motor: '🏍️',
-  mobil: '🚗',
-  transportasi_umum: '🚌',
+function getJenisIcon(jenis: string, size: number = 24) {
+  if (jenis === 'motor') return <Bike size={size} />
+  if (jenis === 'mobil') return <Car size={size} />
+  return <Bus size={size} />
 }
 
 const PAGE_SIZE = 10
@@ -92,11 +93,11 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
             onClick={onClose}
             className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors text-lg"
           >
-            ✕
+            <X size={20} />
           </button>
 
           <div className="text-center">
-            <div className="text-5xl mb-3">{JENIS_ICON[trip.jenis] ?? '🚗'}</div>
+            <div className="flex justify-center mb-3 text-gray-700">{getJenisIcon(trip.jenis, 48)}</div>
             <div className="text-base font-bold text-gray-800 mb-1">
               {getJenisLabel(trip)} — {getBbmLabel(trip)}
             </div>
@@ -106,7 +107,7 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
                 ? 'bg-red-50 text-red-600'
                 : 'bg-[#E1F5EE] text-[#085041]'
             }`}>
-              {isKendaraan ? 'Kendaraan Pribadi' : 'Transportasi Hijau 🌿'}
+              {isKendaraan ? 'Kendaraan Pribadi' : <span className="flex items-center justify-center gap-1">Transportasi Hijau <Leaf size={14} /></span>}
             </span>
           </div>
         </div>
@@ -214,7 +215,7 @@ function TripDetailModal({ trip, onClose }: { trip: Trip; onClose: () => void })
                 </div>
               </div>
               <div className="mt-2 text-xs text-[#1D9E75] font-medium text-center">
-                🌿 Kamu hemat {((1 - trip.emisi_kg / emisiMobil) * 100).toFixed(0)}% emisi dibanding naik mobil!
+                <span className="flex items-center justify-center gap-1.5"><Leaf size={14} /> Kamu hemat {((1 - trip.emisi_kg / emisiMobil) * 100).toFixed(0)}% emisi dibanding naik mobil!</span>
               </div>
             </div>
           )}
@@ -255,7 +256,7 @@ export default function RiwayatPage() {
   const [sortBy, setSortBy] = useState<SortBy>('terbaru')
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) router.push('/login')
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -334,9 +335,9 @@ export default function RiwayatPage() {
             <div className="flex gap-1.5 flex-wrap">
               {([
                 { val: 'semua', label: 'Semua' },
-                { val: 'kendaraan', label: '🏍️ Kendaraan' },
-                { val: 'umum', label: '🚌 Trans. Umum' },
-              ] as { val: FilterJenis; label: string }[]).map(f => (
+                { val: 'kendaraan', label: <span className="flex items-center gap-1.5"><Bike size={14} /> Kendaraan</span> },
+                { val: 'umum', label: <span className="flex items-center gap-1.5"><Bus size={14} /> Trans. Umum</span> },
+              ] as { val: FilterJenis; label: React.ReactNode }[]).map(f => (
                 <button
                   key={f.val}
                   onClick={() => setFilterJenis(f.val)}
@@ -399,7 +400,7 @@ export default function RiwayatPage() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="text-5xl mb-4">🛣️</div>
+                <div className="mb-4 text-gray-300"><Map size={48} /></div>
                 <div className="text-gray-500 font-medium mb-1">Belum ada perjalanan tercatat</div>
                 <div className="text-gray-400 text-sm mb-5">Mulai catat perjalananmu untuk melihat dampak emisi</div>
                 <Link href="/kalkulator"
@@ -418,7 +419,7 @@ export default function RiwayatPage() {
                     >
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         {/* Icon */}
-                        <div className="text-2xl shrink-0">{JENIS_ICON[trip.jenis] ?? '🚗'}</div>
+                        <div className="text-gray-500 shrink-0">{getJenisIcon(trip.jenis, 24)}</div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">

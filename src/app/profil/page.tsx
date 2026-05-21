@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { SkeletonCard, SkeletonText } from '@/components/Skeleton'
+import { Sprout, Flame, Bus, Wind, TreePine, Trophy, Star, Building2, Mail, Calendar, Shield, MapPin, Edit3, Lock, Check } from 'lucide-react'
+import LevelBadge from '@/components/LevelBadge'
+import { LEVEL_BADGES, getLevelByPoin } from '@/lib/level'
 
 type Profile = {
   id: string
@@ -30,7 +33,7 @@ type TripStats = {
 const BADGE_DEFINITIONS = [
   {
     id: 'pemula',
-    icon: '🌱',
+    icon: <Sprout size={32} className="text-[#1D9E75]" />,
     nama: 'Pemula Hijau',
     deskripsi: 'Catat perjalanan pertamamu',
     check: (p: Profile, s: TripStats) => s.totalTrip >= 1,
@@ -38,7 +41,7 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'konsisten',
-    icon: '🔥',
+    icon: <Flame size={32} className="text-orange-500" />,
     nama: 'Konsisten',
     deskripsi: 'Streak 3 hari berturut-turut',
     check: (p: Profile, s: TripStats) => p.streak >= 3,
@@ -46,7 +49,7 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'green_commuter',
-    icon: '🚌',
+    icon: <Bus size={32} className="text-blue-500" />,
     nama: 'Green Commuter',
     deskripsi: 'Gunakan transportasi umum 7x',
     check: (p: Profile, s: TripStats) => s.tripUmumCount >= 7,
@@ -54,7 +57,7 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'penyelamat',
-    icon: '💨',
+    icon: <Wind size={32} className="text-cyan-500" />,
     nama: 'Penyelamat Udara',
     deskripsi: 'Hemat 10 kg CO₂ total',
     check: (p: Profile, s: TripStats) => p.total_hemat >= 10,
@@ -62,7 +65,7 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'eco_warrior',
-    icon: '🌳',
+    icon: <TreePine size={32} className="text-green-600" />,
     nama: 'Eco Warrior',
     deskripsi: 'Hemat 50 kg CO₂ total',
     check: (p: Profile, s: TripStats) => p.total_hemat >= 50,
@@ -70,7 +73,7 @@ const BADGE_DEFINITIONS = [
   },
   {
     id: 'legenda',
-    icon: '🏆',
+    icon: <Trophy size={32} className="text-[#FAC775]" />,
     nama: 'Legenda Hijau',
     deskripsi: 'Kumpulkan 500 poin',
     check: (p: Profile, s: TripStats) => p.total_poin >= 500,
@@ -109,7 +112,7 @@ export default function ProfilPage() {
   const [confirmLogout, setConfirmLogout] = useState(false)
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) router.push('/login')
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -271,7 +274,7 @@ export default function ProfilPage() {
                     <div className="text-sm text-gray-400">@{profile.username}</div>
                   )}
                   {profile?.kota && (
-                    <div className="text-sm text-gray-500 mt-1">📍 {profile.kota}</div>
+                    <div className="text-sm text-gray-500 mt-1 flex items-center gap-1.5"><MapPin size={14} /> {profile.kota}</div>
                   )}
                   {!profile?.username && !profile?.kota && (
                     <div className="text-xs text-gray-400 mt-1">Belum lengkap — tambahkan username & kota</div>
@@ -282,7 +285,7 @@ export default function ProfilPage() {
                   onClick={() => setEditing(true)}
                   className="shrink-0 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
                 >
-                  ✏️ Edit Profil
+                  <Edit3 size={14} /> Edit Profil
                 </button>
               </div>
             )}
@@ -316,19 +319,17 @@ export default function ProfilPage() {
           {/* ── GAMIFIKASI ── */}
           <div>
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1">Gamifikasi</div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="mb-3">
+              <LevelBadge poin={profile?.total_poin ?? 0} size="lg" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
-                <div className="text-2xl mb-1">⭐</div>
-                <div className="text-xl font-bold text-[#FAC775]">{profile?.total_poin ?? 0}</div>
-                <div className="text-xs text-gray-400 mt-0.5">Poin Total</div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
-                <div className="text-2xl mb-1">🔥</div>
+                <div className="mb-1 flex justify-center text-orange-500"><Flame size={24} /></div>
                 <div className="text-xl font-bold text-orange-500">{profile?.streak ?? 0}</div>
                 <div className="text-xs text-gray-400 mt-0.5">Streak Hari</div>
               </div>
               <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-center">
-                <div className="text-2xl mb-1">🏙️</div>
+                <div className="mb-1 flex justify-center text-blue-500"><Building2 size={24} /></div>
                 {rankingInfo ? (
                   <>
                     <div className="text-xl font-bold text-[#1D9E75]">#{rankingInfo.rank}</div>
@@ -348,7 +349,7 @@ export default function ProfilPage() {
 
           {/* ── BADGE ── */}
           <div>
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1">Badge & Pencapaian</div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1 mt-6">Badge Aktivitas</div>
             <div className="grid grid-cols-3 gap-3">
               {BADGE_DEFINITIONS.map(badge => {
                 const unlocked = profile && stats ? badge.check(profile, stats) : false
@@ -367,13 +368,13 @@ export default function ProfilPage() {
                     {/* Corner marker */}
                     <div className="absolute top-2 right-2 text-xs">
                       {unlocked ? (
-                        <span className="text-[#1D9E75] font-bold">✓</span>
+                        <Check size={12} className="text-[#1D9E75]" />
                       ) : (
-                        <span>🔒</span>
+                        <Lock size={12} className="text-gray-400" />
                       )}
                     </div>
 
-                    <div className={`text-2xl mb-1.5 ${!unlocked ? 'grayscale' : ''}`}>
+                    <div className={`mb-2 flex justify-center ${!unlocked ? 'grayscale opacity-50' : ''}`}>
                       {badge.icon}
                     </div>
                     <div className="text-xs font-bold text-gray-700 leading-tight">{badge.nama}</div>
@@ -399,14 +400,45 @@ export default function ProfilPage() {
             </div>
           </div>
 
+          <div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1 mt-6">Badge Level</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {LEVEL_BADGES.map(badge => {
+                const currentLevel = getLevelByPoin(profile?.total_poin ?? 0).level
+                const unlocked = currentLevel >= badge.levelRequired
+                const Icon = badge.icon
+
+                return (
+                  <div
+                    key={badge.nama}
+                    className={`relative rounded-xl border p-3 shadow-sm transition-all ${
+                      unlocked
+                        ? 'bg-[#E1F5EE] border-[#9FE1CB]'
+                        : 'bg-gray-50 border-gray-100 opacity-60'
+                    }`}
+                  >
+                    <div className="absolute top-2 right-2 text-xs">
+                      {unlocked ? <Check size={12} className="text-[#1D9E75]" /> : <Lock size={12} className="text-gray-400" />}
+                    </div>
+                    <div className={`mb-2 flex justify-center text-3xl ${!unlocked ? 'grayscale opacity-50' : 'text-[#1D9E75]'}`}>
+                      <Icon size={32} />
+                    </div>
+                    <div className="text-xs font-bold text-gray-700 leading-tight text-center">{badge.nama}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5 leading-tight text-center">{badge.deskripsi}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
           {/* ── INFO AKUN ── */}
           <div>
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 px-1">Info Akun</div>
             <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm space-y-3">
               {[
-                { label: 'Email', val: user?.email ?? '—', icon: '✉️' },
-                { label: 'Bergabung sejak', val: profile ? formatTanggal(profile.created_at) : '—', icon: '📅' },
-                { label: 'Provider', val: 'Google', icon: '🔐' },
+                { label: 'Email', val: user?.email ?? '—', icon: <Mail size={16} /> },
+                { label: 'Bergabung sejak', val: profile ? formatTanggal(profile.created_at) : '—', icon: <Calendar size={16} /> },
+                { label: 'Provider', val: 'Google', icon: <Shield size={16} /> },
               ].map((item, i) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                   <div className="flex items-center gap-2 text-sm text-gray-500">

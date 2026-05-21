@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { toBlob } from 'html-to-image'
-import { X, Award } from 'lucide-react'
+import { X, Award, Medal, Target, Users, Globe, Bus, PartyPopper, Share, Sprout, Trophy, Image as ImageIcon, MessageSquare, Copy, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import { getUserCity } from '@/lib/location'
 import { showToast } from '@/components/Toast'
+import LevelBadge from '@/components/LevelBadge'
 
 type Profile = {
   id: string
@@ -24,7 +25,7 @@ type Stats = {
   totalTripHijau: number
 }
 
-type Tab = 'semua' | 'kota' | 'sekitar'
+type Tab = 'semua' | 'kota' | 'poin'
 
 // ── Skeleton helpers ──────────────────────────────────────────────────────────
 function SkeletonRow() {
@@ -60,7 +61,11 @@ function SkeletonPodium() {
 }
 
 // ── Medal colours ─────────────────────────────────────────────────────────────
-const MEDALS = ['🥇', '🥈', '🥉']
+const MEDALS = [
+  <Medal key="1" size={24} className="text-amber-500 fill-amber-500" />,
+  <Medal key="2" size={24} className="text-gray-300 fill-gray-300" />,
+  <Medal key="3" size={24} className="text-orange-600 fill-orange-600" />
+]
 const PODIUM_BG = ['bg-[#FAC775]', 'bg-gray-300', 'bg-amber-600']
 const PODIUM_TEXT = ['text-[#085041]', 'text-white', 'text-white']
 const PODIUM_GLOW = [
@@ -76,7 +81,7 @@ export default function LeaderboardPage() {
   const [tab, setTab] = useState<Tab>('semua')
   const [allRanking, setAllRanking] = useState<Profile[]>([])
   const [kotaRanking, setKotaRanking] = useState<Profile[]>([])
-  const [sekitarRanking, setSekitarRanking] = useState<Profile[]>([])
+  const [poinRanking, setPoinRanking] = useState<Profile[]>([])
   const [currentCity, setCurrentCity] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<Profile | null>(null)
   const [userGlobalRank, setUserGlobalRank] = useState<number | null>(null)
@@ -94,7 +99,7 @@ export default function LeaderboardPage() {
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) router.push('/login')
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -147,19 +152,11 @@ export default function LeaderboardPage() {
     const detectedCity = await getUserCity(meRaw?.kota || 'Jakarta')
     setCurrentCity(detectedCity)
 
-    // Aggregate hemat + poin per user from trips (source of truth)
-    const statsByUser: Record<string, { hemat: number; poin: number }> = {}
-    for (const t of tripsRaw ?? []) {
-      if (!statsByUser[t.user_id]) statsByUser[t.user_id] = { hemat: 0, poin: 0 }
-      statsByUser[t.user_id].hemat += t.emisi_dihemat ?? 0
-      statsByUser[t.user_id].poin  += t.poin_didapat  ?? 0
-    }
-
-    // Enrich profiles with trip-computed stats
+    // Gunakan total_hemat dan total_poin langsung dari tabel profiles agar konsisten dengan Dashboard
     const enriched: Profile[] = (profilesRaw ?? []).map(p => ({
       ...p,
-      total_hemat: Number((statsByUser[p.id]?.hemat ?? 0).toFixed(2)),
-      total_poin:  statsByUser[p.id]?.poin ?? 0,
+      total_hemat: p.total_hemat ?? 0,
+      total_poin:  p.total_poin ?? 0,
     }))
 
     // 1. Global ranking — sort by computed hemat
@@ -207,11 +204,9 @@ export default function LeaderboardPage() {
       setKotaRanking(sortByHemat(kotaProfiles).slice(0, 20))
     }
 
-    // 4. Sekitar filter ranking
-    if (detectedCity) {
-      const sekitarProfiles = enriched.filter(p => isSameCity(p.kota, detectedCity))
-      setSekitarRanking(sortByHemat(sekitarProfiles).slice(0, 20))
-    }
+    // 4. Top Poin ranking
+    const poinGlobal = [...enriched].sort((a, b) => (b.total_poin ?? 0) - (a.total_poin ?? 0)).slice(0, 20)
+    setPoinRanking(poinGlobal)
 
     // 4. Community stats — computed from trips
     const totalHematKomunitas = enriched.reduce((s, p) => s + (p.total_hemat ?? 0), 0)
@@ -236,7 +231,7 @@ export default function LeaderboardPage() {
     setLoading(false)
   }
 
-  const ranking = tab === 'semua' ? allRanking : tab === 'kota' ? kotaRanking : sekitarRanking
+  const ranking = tab === 'semua' ? allRanking : tab === 'kota' ? kotaRanking : poinRanking
   const podium = ranking.slice(0, 3)
   // Podium display order: 2nd (left), 1st (centre, taller), 3rd (right)
   const podiumOrder = [podium[1], podium[0], podium[2]]
@@ -303,7 +298,7 @@ export default function LeaderboardPage() {
           </div>
           {/* Tab pills */}
           <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5 overflow-x-auto">
-            {(['semua', 'kota', 'sekitar'] as Tab[]).map(t => (
+            {(['semua', 'kota', 'poin'] as Tab[]).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -313,7 +308,7 @@ export default function LeaderboardPage() {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {t === 'semua' ? 'Semua' : t === 'kota' ? `Kota Saya${userProfile?.kota ? ` (${userProfile.kota})` : ''}` : `Sekitar (${currentCity ?? '...'})`}
+                {t === 'semua' ? 'Semua' : t === 'kota' ? `Kota Saya${userProfile?.kota ? ` (${userProfile.kota})` : ''}` : 'Top Poin'}
               </button>
             ))}
           </div>
@@ -350,7 +345,7 @@ export default function LeaderboardPage() {
                               {(p.username || 'U')[0].toUpperCase()}
                             </div>
                             {/* Medal */}
-                            <div className="text-lg leading-none">{MEDALS[origIdx]}</div>
+                            <div className="text-lg leading-none flex items-center justify-center h-6">{MEDALS[origIdx]}</div>
                             {/* Name */}
                             <div className="text-xs font-semibold text-gray-700 max-w-[64px] text-center truncate">
                               {p.username || 'User'}
@@ -400,7 +395,7 @@ export default function LeaderboardPage() {
                 {/* Challenge card */}
                 <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">🎯</span>
+                    <Target size={24} className="text-amber-500" />
                     <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
                       Tantangan Minggu Ini
                     </div>
@@ -430,7 +425,7 @@ export default function LeaderboardPage() {
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-xs text-amber-500">Hadiah</div>
                     <div className="bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full">
-                      +500 poin 🏅
+                      +500 poin <Award size={14} className="inline ml-1" />
                     </div>
                   </div>
                 </div>
@@ -455,19 +450,19 @@ export default function LeaderboardPage() {
                         {
                           label: 'Total pengguna',
                           value: `${stats?.totalUser ?? 0} orang`,
-                          icon: '👥',
+                          icon: <Users size={16} />,
                           color: 'text-[#1D9E75]',
                         },
                         {
                           label: 'CO₂ dihemat komunitas',
                           value: `${stats?.totalHematKomunitas ?? 0} kg`,
-                          icon: '🌍',
+                          icon: <Globe size={16} />,
                           color: 'text-[#1D9E75]',
                         },
                         {
                           label: 'Total trip hijau',
                           value: `${(stats?.totalTripHijau ?? 0).toLocaleString()} trip`,
-                          icon: '🚌',
+                          icon: <Bus size={16} />,
                           color: 'text-[#1D9E75]',
                         },
                       ].map((s, i) => (
@@ -491,7 +486,7 @@ export default function LeaderboardPage() {
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
                     <div>
                       <div className="text-sm font-bold text-amber-900 mb-0.5">
-                        🎉 Kamu masuk Top {meInCurrentRanking + 1}! Bagikan pencapaianmu!
+                        <PartyPopper size={16} className="inline mr-1" /> Kamu masuk Top {meInCurrentRanking + 1}! Bagikan pencapaianmu!
                       </div>
                       <div className="text-xs text-amber-700">
                         Inspirasi lebih banyak orang untuk ikut kurangi emisi.
@@ -501,14 +496,14 @@ export default function LeaderboardPage() {
                       onClick={() => setShowShareModal(true)}
                       className="whitespace-nowrap px-4 py-2 bg-[#25D366] text-white text-xs font-bold rounded-lg hover:bg-[#1DA851] transition-colors shadow-sm text-center"
                     >
-                      📤 Bagikan Sekarang
+                      <Share size={14} className="inline mr-1" /> Bagikan Sekarang
                     </button>
                   </div>
                 )}
 
                 <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">
-                  {tab === 'semua' ? 'Semua Peserta' : tab === 'kota' ? `Peserta di ${userProfile?.kota ?? 'Kota Kamu'}` : `Peserta di Sekitarmu (${currentCity ?? '...'})`}
+                  {tab === 'semua' ? 'Semua Peserta' : tab === 'kota' ? `Peserta di ${userProfile?.kota ?? 'Kota Kamu'}` : 'Peserta dengan Poin Tertinggi'}
                 </div>
 
                 {loading ? (
@@ -519,12 +514,10 @@ export default function LeaderboardPage() {
                   </div>
                 ) : ranking.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-gray-300">
-                    <div className="text-4xl mb-3">🌱</div>
+                    <div className="mb-3 text-gray-300"><Sprout size={40} /></div>
                     <div className="text-sm text-center">
                       {tab === 'kota'
                         ? 'Belum ada peserta dari kota kamu.'
-                        : tab === 'sekitar'
-                        ? 'Belum ada peserta di sekitarmu.'
                         : 'Belum ada data. Jadilah yang pertama!'}
                     </div>
                   </div>
@@ -546,7 +539,7 @@ export default function LeaderboardPage() {
                           {/* Rank number or medal with change arrow */}
                           <div className="w-7 text-center flex-shrink-0">
                             {i < 3 ? (
-                              <span className="text-base leading-none">{MEDALS[i]}</span>
+                              <span className="text-base leading-none flex justify-center"><div className="scale-75 origin-center">{MEDALS[i]}</div></span>
                             ) : (
                               <span className="text-sm font-semibold text-gray-400">
                                 {i + 1}
@@ -592,7 +585,8 @@ export default function LeaderboardPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-gray-400 truncate">{r.kota}</div>
+                            <div className="text-xs text-gray-400 truncate mb-1">{r.kota}</div>
+                            <LevelBadge poin={r.total_poin ?? 0} size="sm" />
                           </div>
 
                           {/* Score */}
@@ -672,9 +666,9 @@ export default function LeaderboardPage() {
               <div className="absolute bottom-[-50px] right-[-50px] w-64 h-64 bg-[#1D9E75] opacity-40 rounded-full blur-3xl" />
               
               {/* Top part */}
-              <div className="relative z-10 flex items-center justify-between mt-2 mb-8 w-full px-1">
+              <div className="relative z-10 flex flex-col items-center mt-2 mb-8 w-full gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/EmiTrackLogo3.png" alt="EmiTrack" className="h-20 object-contain drop-shadow-md brightness-0 invert scale-110 origin-left" />
+                <img src="/EmiTrackLogo1.png" alt="EmiTrack" className="h-8 object-contain drop-shadow-md brightness-0 invert" />
                 <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 text-[11px] font-bold text-[#FAC775] uppercase tracking-widest shadow-xl whitespace-nowrap">
                   EmiTrack {new Date().getFullYear()} Wrapped
                 </div>
@@ -682,7 +676,7 @@ export default function LeaderboardPage() {
 
               <div className="relative z-10 flex flex-col items-center flex-1 justify-center -mt-6">
                 <div className="w-24 h-24 rounded-full bg-white/10 mx-auto mb-5 flex items-center justify-center text-5xl shadow-inner border border-white/10 backdrop-blur-sm">
-                  {meInCurrentRanking === 0 ? '🥇' : meInCurrentRanking === 1 ? '🥈' : meInCurrentRanking === 2 ? '🥉' : '🏆'}
+                  {meInCurrentRanking === 0 ? <Medal size={48} className="text-amber-400" strokeWidth={1.5} /> : meInCurrentRanking === 1 ? <Medal size={48} className="text-gray-300" strokeWidth={1.5} /> : meInCurrentRanking === 2 ? <Medal size={48} className="text-orange-400" strokeWidth={1.5} /> : <Trophy size={48} className="text-yellow-400" strokeWidth={1.5} />}
                 </div>
                 <div className="text-[10px] font-bold text-[#FAC775] uppercase tracking-widest mb-3 bg-black/20 px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
                   Leaderboard {tab === 'semua' ? 'Global' : tab === 'kota' ? 'Kota' : 'Sekitar'}
@@ -702,7 +696,7 @@ export default function LeaderboardPage() {
                 <div className="w-full bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shadow-xl flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🌍</span>
+                      <Globe size={16} className="text-white/90" />
                       <span className="text-xs font-semibold text-white/90">Total Hemat Emisi</span>
                     </div>
                     <div className="text-sm font-bold text-[#FAC775]">{(userProfile?.total_hemat ?? 0).toFixed(1)} kg CO₂</div>
@@ -726,7 +720,7 @@ export default function LeaderboardPage() {
                   disabled={isGeneratingImage}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#1D9E75] text-white font-bold rounded-xl hover:bg-[#0F6E56] transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-sm"
                 >
-                  {isGeneratingImage ? 'Memproses...' : '📸 Share Gambar'}
+                  {isGeneratingImage ? 'Memproses...' : <><ImageIcon size={16} /> Share Gambar</>}
                 </button>
                 <button
                   onClick={async () => {
@@ -747,7 +741,7 @@ export default function LeaderboardPage() {
                   }}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-all shadow-sm active:scale-[0.98] text-sm"
                 >
-                  💬 Share Teks
+                  <MessageSquare size={16} /> Share Teks
                 </button>
               </div>
               
@@ -760,13 +754,13 @@ export default function LeaderboardPage() {
                   }}
                   className="flex-1 py-3 border-2 border-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all active:scale-[0.98] text-sm"
                 >
-                  {copied ? '✓ Tersalin!' : '📋 Copy Link'}
+                  {copied ? <span className="flex items-center justify-center gap-2"><CheckCircle2 size={16} /> Tersalin!</span> : <span className="flex items-center justify-center gap-2"><Copy size={16} /> Copy Link</span>}
                 </button>
                 <button
                   onClick={() => setShowShareModal(false)}
                   className="flex-1 py-3 text-gray-500 font-medium rounded-xl hover:bg-gray-50 transition-all text-sm"
                 >
-                  ✕ Tutup
+                  <span className="flex items-center justify-center gap-1.5"><X size={16} /> Tutup</span>
                 </button>
               </div>
             </div>

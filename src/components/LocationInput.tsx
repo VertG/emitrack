@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { MapPin } from 'lucide-react'
 
 export type NominatimResult = {
   lat: string
@@ -117,7 +118,7 @@ export default function LocationInput({ label, placeholder, value, onChange }: L
           disabled={loading}
           className="px-3 py-2 bg-[#E1F5EE] text-[#1D9E75] text-sm font-medium rounded-lg hover:bg-[#c5eadb] transition-colors flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
         >
-          📍 Lokasi Saya
+          <MapPin size={16} className="shrink-0" /> Lokasi Saya
         </button>
       </div>
 

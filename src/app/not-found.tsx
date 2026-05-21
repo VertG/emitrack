@@ -1,6 +1,5 @@
 import Link from 'next/link'
-import Image from 'next/image'
-
+import { Leaf, Home, Calculator, Trophy, Car, Wind } from 'lucide-react'
 export default function NotFound() {
   return (
     <div className="min-h-screen w-full bg-[#E1F5EE] flex flex-col items-center justify-center px-6 text-center">
@@ -11,13 +10,7 @@ export default function NotFound() {
       <div className="relative z-10 max-w-md w-full">
         {/* Icon */}
         <div className="mb-2 animate-bounce select-none">
-          <Image 
-            src="/EmiTrackLogo3.png" 
-            alt="EmiTrack" 
-            width={80} 
-            height={80} 
-            className="object-contain mx-auto opacity-40"
-          />
+          <Leaf size={64} className="text-[#1D9E75] mx-auto" />
         </div>
 
         {/* 404 */}
@@ -34,30 +27,30 @@ export default function NotFound() {
         <p className="text-sm text-[#1D9E75] leading-relaxed mb-10">
           Sepertinya kamu salah jalan...
           <br />
-          tapi setidaknya tidak menghasilkan emisi CO₂! 🚗💨
+          tapi setidaknya tidak menghasilkan emisi CO₂! <span className="inline-flex items-center gap-0.5 ml-1"><Car size={16} /><Wind size={16} /></span>
         </p>
 
         {/* Navigation buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto px-6 py-3 bg-[#1D9E75] text-white text-sm font-semibold rounded-xl hover:bg-[#085041] active:scale-95 transition-all duration-200 shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#1D9E75] text-white text-sm font-semibold rounded-xl hover:bg-[#085041] active:scale-95 transition-all duration-200 shadow-sm"
           >
-            🏠 Kembali ke Dashboard
+            <Home size={16} strokeWidth={2} className="text-current" /> Kembali ke Dashboard
           </Link>
 
           <Link
             href="/kalkulator"
-            className="w-full sm:w-auto px-6 py-3 bg-transparent text-[#1D9E75] text-sm font-semibold rounded-xl border-2 border-[#1D9E75] hover:bg-[#1D9E75] hover:text-white active:scale-95 transition-all duration-200"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-transparent text-[#1D9E75] text-sm font-semibold rounded-xl border-2 border-[#1D9E75] hover:bg-[#1D9E75] hover:text-white active:scale-95 transition-all duration-200"
           >
-            🧮 Kalkulator Emisi
+            <Calculator size={16} strokeWidth={2} className="text-current" /> Kalkulator Emisi
           </Link>
 
           <Link
             href="/leaderboard"
-            className="w-full sm:w-auto px-6 py-3 bg-transparent text-[#1D9E75] text-sm font-semibold rounded-xl border-2 border-[#1D9E75] hover:bg-[#1D9E75] hover:text-white active:scale-95 transition-all duration-200"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-transparent text-[#1D9E75] text-sm font-semibold rounded-xl border-2 border-[#1D9E75] hover:bg-[#1D9E75] hover:text-white active:scale-95 transition-all duration-200"
           >
-            🏆 Leaderboard
+            <Trophy size={16} strokeWidth={2} className="text-current" /> Leaderboard
           </Link>
         </div>
       </div>

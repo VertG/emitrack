@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { hitungEmisi, BBM_OPTIONS, LABEL_BBM } from '@/lib/emisi'
-import { Info, Leaf, Car, Trees, TrendingUp, AlertTriangle, Bus, Bike, Wind, PowerOff, Users, Zap, Globe, Target } from 'lucide-react'
+import { Info, Leaf, Car, Trees, TrendingUp, AlertTriangle, Bus, Bike, Wind, PowerOff, Users, Zap, Globe, Target, BookOpen } from 'lucide-react'
 
 export default function EdukasiPage() {
   const { user, loading } = useAuth()
@@ -18,7 +18,7 @@ export default function EdukasiPage() {
   const [hasilEmisi, setHasilEmisi] = useState<number>(0)
 
   useEffect(() => {
-    if (!loading && !user) router.push('/')
+    if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function EdukasiPage() {
         {/* Topbar */}
         <div className="px-6 py-4 bg-white border-b border-gray-100 flex flex-col">
           <div className="font-medium text-gray-800 flex items-center gap-2">
-            📚 Edukasi & Tips
+            <BookOpen size={20} /> Edukasi & Tips
           </div>
           <div className="text-xs text-gray-400 mt-0.5">Pahami emisimu, ubah kebiasaanmu</div>
         </div>

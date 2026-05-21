@@ -9,7 +9,7 @@ import { hitungEmisi, rekomendasiRute, Rekomendasi } from '@/lib/emisi'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Spinner } from '@/components/Skeleton'
-
+import { Search, Map, Leaf, Bike, Footprints } from 'lucide-react'
 // MapClient must be dynamically imported with ssr: false to avoid window is not defined
 const MapClient = dynamic(() => import('./MapClient'), {
   ssr: false,
@@ -38,7 +38,7 @@ export default function PetaPage() {
   const [lastMileOSRM, setLastMileOSRM] = useState<[number, number][] | null>(null)
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) router.push('/login')
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function PetaPage() {
               onClick={() => setPetaTab(tab)}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${petaTab === tab ? 'text-[#1D9E75] border-b-2 border-[#1D9E75]' : 'text-gray-400'}`}
             >
-              {tab === 'cari' ? '🔍 Cari Rute' : '🗺️ Peta'}
+              {tab === 'cari' ? <span className="flex items-center justify-center gap-2"><Search size={16} /> Cari Rute</span> : <span className="flex items-center justify-center gap-2"><Map size={16} /> Peta</span>}
             </button>
           ))}
         </div>
@@ -312,8 +312,8 @@ export default function PetaPage() {
                       }`}
                   >
                     {i === 0 && (
-                      <div className="absolute top-0 right-0 bg-[#FAC775] text-[#085041] text-[10px] font-bold px-3 py-1 rounded-bl-lg">
-                        Terhijau 🌱
+                      <div className="absolute top-0 right-0 bg-[#FAC775] text-[#085041] text-[10px] font-bold flex items-center px-3 py-1 rounded-bl-lg gap-1">
+                        Terhijau <Leaf size={10} strokeWidth={3} className="text-[#085041]" />
                       </div>
                     )}
                     <div className="font-semibold text-gray-800 mb-2 mt-1 flex items-center gap-2">
@@ -327,8 +327,8 @@ export default function PetaPage() {
                     )}
 
                     {!rec.isTooFar && rec.firstMileMode === 'ride' && (
-                      <div className="text-xs text-amber-600 font-medium mb-2">
-                        🛵 Perlu ojek/motor ke stasiun ({Number(rec.firstMileKm! + rec.lastMileKm!).toFixed(2)} km first+last mile)
+                      <div className="text-xs text-amber-600 font-medium mb-2 flex items-center gap-1.5">
+                        <Bike size={14} /> Perlu ojek/motor ke stasiun ({Number(rec.firstMileKm! + rec.lastMileKm!).toFixed(2)} km first+last mile)
                       </div>
                     )}
 
@@ -336,14 +336,14 @@ export default function PetaPage() {
                       <div className="text-[10px] text-gray-500 mb-3 bg-white/50 p-2 rounded border border-gray-100">
                         <div className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                          {rec.firstMileMode === 'ride' ? '🛵 Ojek' : '🚶 Jalan'} {rec.firstMileKm} km ke {rec.stasiunAwal}
+                          {rec.firstMileMode === 'ride' ? <Bike size={12} className="shrink-0" /> : <Footprints size={12} className="shrink-0" />} {rec.firstMileMode === 'ride' ? 'Ojek' : 'Jalan'} {rec.firstMileKm} km ke {rec.stasiunAwal}
                         </div>
                         <div className="flex items-center gap-1.5 border-l border-gray-300 ml-0.5 pl-1.5 my-1 py-1">
                           <span className="text-blue-500 font-bold tracking-widest text-[8px]">|||</span> Transit {rec.transitKm} km
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                          {rec.firstMileMode === 'ride' ? '🛵 Ojek' : '🚶 Jalan'} {rec.lastMileKm} km ke tujuan
+                          {rec.firstMileMode === 'ride' ? <Bike size={12} className="shrink-0" /> : <Footprints size={12} className="shrink-0" />} {rec.firstMileMode === 'ride' ? 'Ojek' : 'Jalan'} {rec.lastMileKm} km ke tujuan
                         </div>
                       </div>
                     )}

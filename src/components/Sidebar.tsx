@@ -4,23 +4,24 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { BarChart2, Calculator, Map as MapIcon, BookOpen, Trophy, ClipboardList, User, Home } from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', shortLabel: 'Home', icon: '📊' },
-  { href: '/kalkulator', label: 'Kalkulator', shortLabel: 'Hitung', icon: '🧮' },
-  { href: '/peta', label: 'Peta & Rute', shortLabel: 'Peta', icon: '🗺️' },
-  { href: '/edukasi', label: 'Edukasi & Tips', shortLabel: 'Edukasi', icon: '📚' },
-  { href: '/leaderboard', label: 'Leaderboard', shortLabel: 'Ranking', icon: '🏆' },
-  { href: '/riwayat', label: 'Riwayat', shortLabel: 'Riwayat', icon: '📋' },
+  { href: '/dashboard', label: 'Dashboard', shortLabel: 'Home', icon: BarChart2 },
+  { href: '/kalkulator', label: 'Kalkulator', shortLabel: 'Hitung', icon: Calculator },
+  { href: '/peta', label: 'Peta & Rute', shortLabel: 'Peta', icon: MapIcon },
+  { href: '/edukasi', label: 'Edukasi & Tips', shortLabel: 'Edukasi', icon: BookOpen },
+  { href: '/leaderboard', label: 'Leaderboard', shortLabel: 'Ranking', icon: Trophy },
+  { href: '/riwayat', label: 'Riwayat', shortLabel: 'Riwayat', icon: ClipboardList },
 ]
 
 // Mobile bottom nav items (max 5 for space)
 const mobileNavItems = [
-  { href: '/dashboard', shortLabel: 'Home', icon: '📊' },
-  { href: '/kalkulator', shortLabel: 'Hitung', icon: '🧮' },
-  { href: '/peta', shortLabel: 'Peta', icon: '🗺️' },
-  { href: '/riwayat', shortLabel: 'Riwayat', icon: '📋' },
-  { href: '/profil', shortLabel: 'Profil', icon: '👤' },
+  { href: '/dashboard', shortLabel: 'Home', icon: BarChart2 },
+  { href: '/kalkulator', shortLabel: 'Hitung', icon: Calculator },
+  { href: '/peta', shortLabel: 'Peta', icon: MapIcon },
+  { href: '/riwayat', shortLabel: 'Riwayat', icon: ClipboardList },
+  { href: '/profil', shortLabel: 'Profil', icon: User },
 ]
 
 export default function Sidebar() {
@@ -52,7 +53,7 @@ export default function Sidebar() {
                   ? 'text-[#1D9E75] bg-white border-[#1D9E75] font-medium'
                   : 'text-gray-500 border-transparent hover:bg-white hover:text-gray-700'
               }`}>
-              <span>{item.icon}</span>
+              <item.icon size={18} strokeWidth={2} className="text-current shrink-0" />
               {item.label}
             </Link>
           ))}
@@ -61,14 +62,13 @@ export default function Sidebar() {
           <div className="mx-4 my-3 border-t border-gray-100" />
           <div className="text-[10px] text-gray-400 tracking-widest px-4 py-2 uppercase">Lainnya</div>
 
-          {/* Beranda */}
           <Link href="/"
             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors border-l-2 ${
               pathname === '/'
                 ? 'text-[#1D9E75] bg-white border-[#1D9E75] font-medium'
                 : 'text-gray-500 border-transparent hover:bg-white hover:text-gray-700'
             }`}>
-            <span>🏠</span>
+            <Home size={18} strokeWidth={2} className="text-current shrink-0" />
             Beranda
           </Link>
 
@@ -79,7 +79,7 @@ export default function Sidebar() {
                 ? 'text-[#1D9E75] bg-white border-[#1D9E75] font-medium'
                 : 'text-gray-500 border-transparent hover:bg-white hover:text-gray-700'
             }`}>
-            <span>👤</span>
+            <User size={18} strokeWidth={2} className="text-current shrink-0" />
             Profil & Keluar
           </Link>
         </nav>
@@ -94,11 +94,11 @@ export default function Sidebar() {
       <nav className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-white border-t border-gray-100 flex safe-area-inset-bottom">
         {mobileNavItems.map(item => (
           <Link key={item.href} href={item.href}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 transition-colors ${
               pathname === item.href ? 'text-[#1D9E75]' : 'text-gray-400'
             }`}>
-            <span className="text-xl leading-none">{item.icon}</span>
-            <span className="text-[10px] font-medium leading-none mt-0.5">{item.shortLabel}</span>
+            <item.icon size={20} strokeWidth={1.5} className="text-current" />
+            <span className="text-[10px] font-medium">{item.shortLabel}</span>
           </Link>
         ))}
       </nav>

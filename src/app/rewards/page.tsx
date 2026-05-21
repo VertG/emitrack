@@ -11,7 +11,7 @@ export default function RewardsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) router.push('/')
+    if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
   if (loading) return <div className="flex items-center justify-center h-screen text-gray-400">Memuat...</div>

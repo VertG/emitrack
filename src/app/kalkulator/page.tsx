@@ -6,12 +6,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { hitungEmisi, RATA_RATA_NASIONAL, rekomendasiRute, KONSUMSI, FAKTOR_EMISI, BBM_OPTIONS, LABEL_BBM, CONTOH_MEREK } from '@/lib/emisi'
+import { getLevelByPoin } from '@/lib/level'
 import Sidebar from '@/components/Sidebar'
 import { Spinner } from '@/components/Skeleton'
 import { showToast } from '@/components/Toast'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Area, AreaChart
 } from 'recharts'
+import { Bike, Car, Train, Bus, Info, MapPin, Check, TreePine, Droplets, Plane, Lightbulb, Leaf, Coins, Trophy, LineChart as LineChartIcon, Calculator, BarChart2, Globe } from 'lucide-react'
 
 const JENIS_KENDARAAN = [
   { value: 'motor', label: 'Motor' },
@@ -19,7 +21,7 @@ const JENIS_KENDARAAN = [
 ]
 
 const MODA_BBM_KEYS = ['sepeda', 'krl', 'transjakarta']
-const MODA_ICONS = ['🚲', '🚆', '🚌']
+const MODA_ICONS = [Bike, Train, Bus]
 
 const HARGA_BBM_DEFAULT: Record<string, number> = {
   ron90: 10000,
@@ -124,11 +126,11 @@ function TabProyeksi() {
             <div className="flex gap-2">
               {JENIS_KENDARAAN.map(k => (
                 <button key={k.value} onClick={() => setJenis(k.value)}
-                  className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
+                  className={`flex-1 flex justify-center items-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
                     ? 'bg-[#1D9E75] text-white'
                     : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                   }`}>
-                  {k.value === 'motor' ? '🏍️' : '🚗'} {k.label}
+                  {k.value === 'motor' ? <Bike size={16} /> : <Car size={16} />} {k.label}
                 </button>
               ))}
             </div>
@@ -245,12 +247,12 @@ function TabProyeksi() {
 
           {/* Dampak visual */}
           <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="text-sm font-medium text-gray-700 mb-3">🌍 Dampak Emisi Tahunanmu</div>
+            <div className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-1.5"><Globe size={16} /> Dampak Emisi Tahunanmu</div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { icon: '🌳', label: 'Pohon', val: pohon.toLocaleString('id-ID'), sub: 'harus ditanam' },
-                { icon: '🚿', label: 'Air', val: `${Math.round(airLiter / 1000)}rb`, sub: 'liter penyerap' },
-                { icon: '✈️', label: 'Terbang', val: `${jamTerbang}`, sub: 'jam domestik' },
+                { icon: <TreePine size={24} />, label: 'Pohon', val: pohon.toLocaleString('id-ID'), sub: 'harus ditanam' },
+                { icon: <Droplets size={24} />, label: 'Air', val: `${Math.round(airLiter / 1000)}rb`, sub: 'liter penyerap' },
+                { icon: <Plane size={24} />, label: 'Terbang', val: `${jamTerbang}`, sub: 'jam domestik' },
               ].map(d => (
                 <div key={d.label} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-100">
                   <div className="text-2xl mb-1">{d.icon}</div>
@@ -263,17 +265,17 @@ function TabProyeksi() {
 
           {/* Skenario penghematan */}
           <div className="bg-[#E1F5EE] border border-[#9FE1CB] rounded-xl p-4">
-            <div className="text-sm font-bold text-[#085041] mb-1">💡 Skenario Penghematan</div>
+            <div className="text-sm font-bold text-[#085041] mb-1 flex items-center gap-1.5"><Lightbulb size={16} /> Skenario Penghematan</div>
             <div className="text-xs text-[#1D9E75] mb-3">
               Jika beralih ke transportasi umum <strong>{hariHijau} hari/minggu</strong>:
             </div>
             <div className="space-y-2">
               {[
-                { label: '🌿 Emisi dihemat', val: `${emisiDihemat.toLocaleString('id-ID')} kg CO₂/tahun` },
-                { label: '💰 Biaya dihemat', val: `Rp ${Math.max(0, biayaDihemat).toLocaleString('id-ID')}/tahun` },
-                { label: '🏆 Poin EmiTrack', val: `+${poinPotensi.toLocaleString('id-ID')} poin/tahun` },
+                { label: <span className="flex items-center gap-1.5"><Leaf size={14} /> Emisi dihemat</span>, val: `${emisiDihemat.toLocaleString('id-ID')} kg CO₂/tahun`, key: 'emisi' },
+                { label: <span className="flex items-center gap-1.5"><Coins size={14} /> Biaya dihemat</span>, val: `Rp ${Math.max(0, biayaDihemat).toLocaleString('id-ID')}/tahun`, key: 'biaya' },
+                { label: <span className="flex items-center gap-1.5"><Trophy size={14} /> Poin EmiTrack</span>, val: `+${poinPotensi.toLocaleString('id-ID')} poin/tahun`, key: 'poin' },
               ].map(row => (
-                <div key={row.label} className="flex justify-between items-center">
+                <div key={row.key} className="flex justify-between items-center">
                   <span className="text-xs text-[#085041]">{row.label}</span>
                   <span className="text-xs font-bold text-[#085041]">{row.val}</span>
                 </div>
@@ -288,7 +290,7 @@ function TabProyeksi() {
 
       {/* Grafik proyeksi bulanan */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="text-sm font-medium text-gray-700 mb-1">📈 Proyeksi Emisi Bulanan</div>
+        <div className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5"><LineChartIcon size={16} /> Proyeksi Emisi Bulanan</div>
         <div className="text-xs text-gray-400 mb-4">Perbandingan emisi kendaraan pribadi vs campuran transportasi umum</div>
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
@@ -347,7 +349,7 @@ function KalkulatorContent() {
   const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/')
+    if (!authLoading && !user) router.push('/login')
   }, [user, authLoading, router])
 
   // Jika dari peta, aktifkan tab hitung
@@ -403,6 +405,15 @@ function KalkulatorContent() {
         currentStreak = 1
         toastMsg = `🔥 Streak 1 hari! Pertahankan!`
       }
+    }
+
+    const poinBefore = profile.total_poin ?? 0
+    const poinAfter = poinBefore + tambahPoin
+    const levelBefore = getLevelByPoin(poinBefore)
+    const levelAfter = getLevelByPoin(poinAfter)
+
+    if (levelAfter.level > levelBefore.level) {
+      toastMsg = `🎉 Level Up! Kamu sekarang ${levelAfter.nama}!`
     }
 
     await supabase
@@ -481,8 +492,8 @@ function KalkulatorContent() {
         <div className="bg-white border-b border-gray-100 px-6">
           <div className="flex gap-0">
             {[
-              { key: 'hitung', label: '🧮 Hitung Emisi' },
-              { key: 'proyeksi', label: '📊 Proyeksi Tahunan' },
+              { key: 'hitung', label: <span className="flex items-center gap-1.5"><Calculator size={16} /> Hitung Emisi</span> },
+              { key: 'proyeksi', label: <span className="flex items-center gap-1.5"><BarChart2 size={16} /> Proyeksi Tahunan</span> },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -513,11 +524,11 @@ function KalkulatorContent() {
                   <div className="flex gap-2">
                     {JENIS_KENDARAAN.map(k => (
                       <button key={k.value} onClick={() => { setJenis(k.value); setBbm('ron92') }}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
+                        className={`flex-1 flex justify-center items-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${jenis === k.value
                           ? 'bg-[#1D9E75] text-white'
                           : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                           }`}>
-                        {k.value === 'motor' ? '🏍️' : '🚗'} {k.label}
+                        {k.value === 'motor' ? <Bike size={16} /> : <Car size={16} />} {k.label}
                       </button>
                     ))}
                   </div>
@@ -551,7 +562,7 @@ function KalkulatorContent() {
                   </div>
                   <div className="mt-4 text-xs text-gray-400">
                     <Link href="/edukasi" className="hover:text-[#1D9E75] hover:underline flex items-start gap-1.5">
-                      <span className="shrink-0 font-bold">ⓘ</span>
+                      <Info size={14} className="shrink-0 mt-0.5" />
                       <span className="leading-relaxed">RON (Research Octane Number) adalah standar internasional yang berlaku untuk semua merek — Pertamina, Shell, Vivo, BP, Total, dll.</span>
                     </Link>
                   </div>
@@ -563,8 +574,8 @@ function KalkulatorContent() {
                     <div className="flex items-center gap-2">
                       <div className="text-sm font-medium text-gray-700">Jarak Tempuh Harian</div>
                       {dariPeta && (
-                        <span className="text-[10px] bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB] px-2 py-0.5 rounded-full font-medium">
-                          📍 Dari Peta
+                        <span className="flex items-center gap-1 text-[10px] bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB] px-2 py-0.5 rounded-full font-medium">
+                          <MapPin size={10} /> Dari Peta
                         </span>
                       )}
                     </div>
@@ -644,7 +655,10 @@ function KalkulatorContent() {
                     {rekomendasi.map((r, i) => (
                       <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${i === 0 ? 'border-[#9FE1CB] bg-[#E1F5EE]' : 'border-gray-100'
                         }`}>
-                        <span className="text-xl">{MODA_ICONS[i]}</span>
+                        {(() => {
+                          const Icon = MODA_ICONS[i];
+                          return <Icon size={24} className={i === 0 ? "text-[#1D9E75]" : "text-gray-500"} />;
+                        })()}
                         <div className="flex-1">
                           <div className="text-sm font-medium text-gray-700">{r.moda}</div>
                           <div className="text-xs text-gray-400">
@@ -679,7 +693,7 @@ function KalkulatorContent() {
                     : 'bg-[#1D9E75] text-white hover:bg-[#0F6E56]'
                     }`}>
                   {saving && <Spinner />}
-                  {saving ? 'Menyimpan...' : saved ? '✓ Tersimpan! +10 poin' : 'Simpan Perjalanan (+10 poin)'}
+                  {saving ? 'Menyimpan...' : saved ? <><Check size={16} /> Tersimpan! +10 poin</> : 'Simpan Perjalanan (+10 poin)'}
                 </button>
               </div>
             </div>
