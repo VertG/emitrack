@@ -122,7 +122,7 @@ export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit }: Map
       {/* Jika tidak ada mode transit (mode mobil standar) */}
       {!activeTransit && ruteOSRM && ruteOSRM.length > 0 && (
         <>
-          <Polyline positions={ruteOSRM} color="#1D9E75" weight={5} opacity={0.8} />
+          <Polyline positions={ruteOSRM} color="#3b82f6" weight={5} opacity={0.8} />
           <FitBounds rute={ruteOSRM} />
         </>
       )}
