@@ -45,7 +45,7 @@ export default function HomePage() {
 
          {/* Mobile background (stacked) */}
          <div className="md:hidden absolute inset-0 w-full h-full z-0 flex flex-col bg-[#15594B]">
-           <div className="h-[40%] bg-white rounded-b-[40px] sm:rounded-b-[60px] shadow-sm z-10 w-full"></div>
+            <div className="h-[40%] bg-white rounded-b-[40px] sm:rounded-b-[60px] shadow-sm z-10 w-full"></div>
          </div>
 
          {/* ── Layer konten (di atas SVG) ── */}
@@ -62,7 +62,7 @@ export default function HomePage() {
             </div>
 
             {/* Kanan/Bawah — area hijau, konten login */}
-            <div className="flex-1 md:w-[45%] lg:w-[40%] xl:w-[35%] flex flex-col justify-center px-8 sm:px-12 md:pl-12 lg:pl-16 xl:pl-24 md:pr-16 lg:pr-24 xl:pr-32 py-10 md:py-0">
+            <div className="flex-1 md:w-[40%] lg:w-[40%] xl:w-[35%] flex flex-col justify-center px-8 sm:px-12 md:pl-12 lg:pl-16 xl:pl-24 md:pr-16 lg:pr-24 xl:pr-32 py-10 md:py-0">
                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-white mb-2 md:mb-1 text-center">
                   Masuk ke EmiTrack
                </h2>
@@ -72,7 +72,7 @@ export default function HomePage() {
 
                <button
                   onClick={signInWithGoogle}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:shadow-lg active:scale-95 transition-all duration-300"
+                  className="w-full max-w-[450px] mx-auto flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-3xl text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:shadow-lg active:scale-95 transition-all duration-300"
                >
                   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                      <path
@@ -102,11 +102,21 @@ export default function HomePage() {
 
                <div className="mt-10 flex justify-center">
                   <button
-                     onClick={() => router.push('/')}
+                     onClick={() => router.push("/")}
                      className="group flex items-center gap-2 text-xs sm:text-sm font-medium text-[#9FE1CB] hover:text-white transition-colors cursor-pointer"
                   >
-                     <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                     <svg
+                        className="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                     >
+                        <path
+                           strokeLinecap="round"
+                           strokeLinejoin="round"
+                           strokeWidth={2}
+                           d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                        />
                      </svg>
                      Kembali ke Beranda
                   </button>
