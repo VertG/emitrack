@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, useMap, CircleMarker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -42,6 +42,13 @@ export type MapClientProps = {
     ruteLastMileOSRM?: [number, number][] | null
   } | null
   visible?: boolean
+  // Navigation mode props
+  isNavigating?: boolean
+  userPosition?: [number, number] | null
+  walkedPath?: [number, number][]
+  // Map click pick mode
+  pickMode?: 'asal' | 'tujuan' | null
+  onMapClick?: (latlng: [number, number]) => void
 }
 
 // Component helper to fit bounds when route changes
@@ -86,7 +93,47 @@ function InvalidateOnVisible({ visible }: { visible: boolean }) {
   return null
 }
 
-export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit, visible = true }: MapClientProps) {
+// Follow user position during navigation mode
+function FollowUser({ position, isNavigating }: { position: [number, number] | null; isNavigating: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    if (isNavigating && position && map && (map as any)._loaded !== undefined) {
+      map.setView(position, Math.max(map.getZoom(), 15), { animate: true })
+    }
+  }, [map, position, isNavigating])
+  return null
+}
+
+// Handle map click events for picking locations
+function MapClickHandler({ pickMode, onMapClick }: { pickMode?: 'asal' | 'tujuan' | null; onMapClick?: (latlng: [number, number]) => void }) {
+  const map = useMap()
+
+  // Update cursor style when pickMode changes
+  useEffect(() => {
+    const container = map.getContainer()
+    if (pickMode) {
+      container.style.cursor = 'crosshair'
+    } else {
+      container.style.cursor = ''
+    }
+    return () => { container.style.cursor = '' }
+  }, [map, pickMode])
+
+  useMapEvents({
+    click(e) {
+      if (pickMode && onMapClick) {
+        onMapClick([e.latlng.lat, e.latlng.lng])
+      }
+    },
+  })
+  return null
+}
+
+export default function MapClient({ 
+  asal, tujuan, ruteOSRM, activeTransit, visible = true,
+  isNavigating = false, userPosition = null, walkedPath = [],
+  pickMode = null, onMapClick,
+}: MapClientProps) {
   // Center TIDAK boleh berubah di MapContainer — update dilakukan via MapController
   const DEFAULT_CENTER: [number, number] = [-6.2088, 106.8456]
 
@@ -106,9 +153,53 @@ export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit, visib
       <MapController asal={asal} />
       {/* Force redraw on mobile tab switch */}
       <InvalidateOnVisible visible={visible} />
+      {/* Follow user during navigation */}
+      <FollowUser position={userPosition ?? null} isNavigating={isNavigating} />
+      {/* Handle map clicks for picking locations */}
+      <MapClickHandler pickMode={pickMode} onMapClick={onMapClick} />
       
       {asal && <Marker position={asal} icon={greenPin} />}
       {tujuan && <Marker position={tujuan} icon={redPin} />}
+
+      {/* ── User position (blue pulsating dot) during navigation ── */}
+      {isNavigating && userPosition && (
+        <>
+          {/* Outer pulse ring */}
+          <CircleMarker
+            center={userPosition}
+            radius={18}
+            pathOptions={{
+              color: '#4285F4',
+              fillColor: '#4285F4',
+              fillOpacity: 0.15,
+              weight: 1,
+              opacity: 0.3,
+            }}
+          />
+          {/* Inner solid dot */}
+          <CircleMarker
+            center={userPosition}
+            radius={8}
+            pathOptions={{
+              color: '#ffffff',
+              fillColor: '#4285F4',
+              fillOpacity: 1,
+              weight: 3,
+              opacity: 1,
+            }}
+          />
+        </>
+      )}
+
+      {/* ── Walked path (rute yang sudah dilalui) ── */}
+      {isNavigating && walkedPath && walkedPath.length > 1 && (
+        <Polyline
+          positions={walkedPath}
+          color="#1D9E75"
+          weight={6}
+          opacity={0.8}
+        />
+      )}
 
       {/* Jika ada mode transit aktif */}
       {activeTransit && asal && tujuan && (
@@ -148,8 +239,8 @@ export default function MapClient({ asal, tujuan, ruteOSRM, activeTransit, visib
       {/* Jika tidak ada mode transit (mode mobil standar) */}
       {!activeTransit && ruteOSRM && ruteOSRM.length > 0 && (
         <>
-          <Polyline positions={ruteOSRM} color="#3b82f6" weight={5} opacity={0.8} />
-          <FitBounds rute={ruteOSRM} />
+          <Polyline positions={ruteOSRM} color={isNavigating ? '#93c5fd' : '#3b82f6'} weight={5} opacity={isNavigating ? 0.5 : 0.8} />
+          {!isNavigating && <FitBounds rute={ruteOSRM} />}
         </>
       )}
       

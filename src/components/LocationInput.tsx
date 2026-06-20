@@ -69,29 +69,62 @@ export default function LocationInput({ label, placeholder, value, onChange }: L
       return
     }
     setLoading(true)
+
+    const applyPosition = async (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude.toString()
+      const lon = pos.coords.longitude.toString()
+      const akurasi = Math.round(pos.coords.accuracy)
+
+      // Reverse geocode untuk dapat nama
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+        const data = await res.json()
+        const loc: NominatimResult = {
+          lat,
+          lon,
+          display_name: data.display_name || 'Lokasi Saya'
+        }
+        onChange(loc)
+      } catch {
+        onChange({ lat, lon, display_name: 'Lokasi Saya' })
+      }
+      return akurasi
+    }
+
+    // Fase 1: Ambil posisi cepat (WiFi/Cell) sebagai fallback
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude.toString()
-        const lon = pos.coords.longitude.toString()
-        
-        // Reverse geocode untuk dapat nama
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
-          const data = await res.json()
-          const loc: NominatimResult = {
-            lat,
-            lon,
-            display_name: data.display_name || 'Lokasi Saya'
+        await applyPosition(pos)
+
+        // Fase 2: Ambil posisi akurat (GPS hardware) — menimpa yang pertama
+        navigator.geolocation.getCurrentPosition(
+          async (precisePos) => {
+            // Hanya pakai jika lebih akurat dari pembacaan pertama
+            if (precisePos.coords.accuracy < pos.coords.accuracy) {
+              await applyPosition(precisePos)
+            }
+            setLoading(false)
+          },
+          () => {
+            // Gagal mendapat posisi akurat, tetap pakai yang pertama
+            setLoading(false)
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 0,      // Selalu ambil pembacaan baru
+            timeout: 15000,     // Tunggu max 15 detik untuk GPS fix
           }
-          onChange(loc)
-        } catch {
-          onChange({ lat, lon, display_name: 'Lokasi Saya' })
-        }
-        setLoading(false)
+        )
       },
       () => {
-        alert('Gagal mengambil lokasi. Pastikan izin lokasi diberikan.')
+        // Tidak bisa dapat posisi sama sekali
+        alert('Gagal mengambil lokasi. Pastikan izin lokasi diberikan dan GPS aktif.')
         setLoading(false)
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 30000,      // Boleh pakai cache 30 detik
+        timeout: 5000,          // Timeout cepat untuk fallback
       }
     )
   }
